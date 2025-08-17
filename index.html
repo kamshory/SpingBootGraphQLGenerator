@@ -8,6 +8,8 @@
   <link href="bootstrap/bootstrap.min.css" rel="stylesheet">
   <script src="js/Column.min.js"></script>
   <script src="js/Entity.min.js"></script>
+  <script src="js/StringUtil.js"></script>
+  <script src="js/SQLParser.js"></script>
   <script src="js/GraphQLSpringGenerator.min.js"></script>
   <script src="js/GraphQLSchemaUtils.min.js"></script>
   <script src="js/SQLConverter.min.js"></script>
@@ -114,7 +116,9 @@
   </div>
   <!-- ...existing code... -->
   <script>
+    let stringUtil = new StringUtil();
     let generator = new GraphQLSpringGenerator();
+    let sqlParser = new SQLParser();
     document.addEventListener('DOMContentLoaded', () => {
       const form = document.getElementById('configForm');
       form.addEventListener('submit', (event) => {
@@ -131,7 +135,7 @@
           maxRelationDepth: parseInt(formData.get('maxRelationDepth')) || 3,
         };
         const sqlFile = formData.get('sqlFile');
-        generator.importSQLFile(sqlFile, (model) => {
+        sqlParser.importSQLFile(sqlFile, (model) => {
           generator.createZipFile(model, config, document.querySelector('#artifactId').value + ".zip");
         });
       });

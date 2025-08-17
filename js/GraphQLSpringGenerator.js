@@ -98,49 +98,7 @@ class GraphQLSpringGenerator {
         }
     }
 
-    /**
-     * Converts a string to camelCase format.
-     * @param {string} str - The input string.
-     * @returns {string} The camelCase formatted string.
-     */
-    camelize(str) {
-        const normalized = str.replace(/[^a-zA-Z0-9 ]/g, ' ').toLowerCase();
-        return normalized.split(' ').map((word, index) => {
-            if (index === 0) return word;
-            return word.charAt(0).toUpperCase() + word.slice(1);
-        }).join('');
-    }
-
-    /**
-     * Converts a camelCase string to UpperCamelCase (PascalCase).
-     * @param {string} camelCaseStr - The camelCase string.
-     * @returns {string} The UpperCamelCase formatted string.
-     */
-    upperCamel(camelCaseStr) {
-        return camelCaseStr
-            .replace(/([A-Z])/g, '$1')
-            .replace(/^./, str => str.toUpperCase());
-    }
-
-    /**
-     * Converts a string to snake_case format.
-     * @param {string} header - The input string.
-     * @returns {string} The snake_case formatted string.
-     */
-    snakeize(header) {
-        let ucwords = header
-            .replace(/[_\-]+/g, ' ')
-            .replace(/([a-z])([A-Z])/g, '$1 $2')
-            .replace(/[^a-zA-Z0-9 ]+/g, '')
-            .toLowerCase()
-            .replace(/\b\w/g, c => c.toUpperCase());
-        let name = ucwords
-            .replace(/\s+/g, "_")
-            .toLowerCase()
-            .replace(/^_+|_+$/g, "")
-            .replace(/__+/g, "_");
-        return name;
-    }
+    
 
     /**
      * Returns all primary key columns from an entity.
@@ -161,7 +119,7 @@ class GraphQLSpringGenerator {
         if (pk) {
             return {
                 primaryKeyName: pk.name,
-                primaryKeyCamel: this.camelize(pk.name),
+                primaryKeyCamel: stringUtil.camelize(pk.name),
                 primaryKeyType: pk.type,
                 primaryKeyJavaType: this.getJavaType(pk.type)
             };
@@ -230,7 +188,7 @@ server.port=${appConfig.port || 8080}
 # Database configuration
 spring.datasource.url=${databaseConfig.url || 'jdbc:mysql://localhost:3306/mydb'}
 spring.datasource.username=${databaseConfig.username || 'root'}
-spring.datasource.password=${databaseConfig.password || ''}
+spring.datasource.password=${databaseConfig.password || ''} 
 spring.datasource.driver-class-name=${databaseConfig.driver || 'com.mysql.cj.jdbc.Driver'}
 # JPA/Hibernate configuration
 spring.jpa.show-sql=${databaseConfig.showSql || 'true'}
@@ -260,19 +218,17 @@ spring.application.version=${this.version}
      * @returns {Array} Array of controller file objects.
      */
     generateControllerFiles() {
-    let _this = this;
     let entities = this.model.entities;
     let file = [];
     entities.forEach(entity => {
         let entityName = entity.name;
-        let entityNameCamel = this.camelize(entityName);
-        let upperCamelEntityName = this.upperCamel(entityNameCamel);
+        let entityNameCamel = stringUtil.camelize(entityName);
+        let upperCamelEntityName = (entityNameCamel);
         let primaryKeys = this.getPrimaryKeys(entity);
 
         if (primaryKeys.length > 0) {
-            let paramList = primaryKeys.map(pk => `@Argument ${this.getJavaType(pk.type)} ${this.camelize(pk.name)}`).join(', ');
-            let callParams = primaryKeys.map(pk => this.camelize(pk.name)).join(', ');
-            let methodNameSuffix = primaryKeys.map(pk => this.upperCamel(this.camelize(pk.name))).join('And');
+            let paramList = primaryKeys.map(pk => `@Argument ${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
+            let callParams = primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ');
             
 
             let controllerContent = `package ${this.packageName}.controller;
@@ -345,8 +301,8 @@ public class ${upperCamelEntityName}Controller {
         let file = [];
         entities.forEach(entity => {
             let entityName = entity.name;
-            let entityNameCamel = this.camelize(entityName);
-            let upperCamelEntityName = this.upperCamel(entityNameCamel);
+            let entityNameCamel = stringUtil.camelize(entityName);
+            let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
             let primaryKeys = this.getPrimaryKeys(entity);
             
             let initFilter = '';
@@ -354,19 +310,19 @@ public class ${upperCamelEntityName}Controller {
             entity.columns.forEach(column => {
                 let dataType = _this.getDataType(column.type);
                 let filterType = _this.getFilterType(dataType);
-                let columnName = _this.camelize(column.name);
+                let columnName = stringUtil.camelize(column.name);
                 initFilter += `\t\tthis.fetchProperties.add("${columnName}", "${columnName}", "${dataType}", "${filterType}");\r\n`
             });
 
             if (primaryKeys.length > 0) {
-                let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${this.camelize(pk.name)}`).join(', ');
-                let callParams = primaryKeys.map(pk => this.camelize(pk.name)).join(', ');
-                let callParamNames = '"'+primaryKeys.map(pk => this.camelize(pk.name)).join('", "')+'"';
-                let methodNameSuffix = primaryKeys.map(pk => this.upperCamel(this.camelize(pk.name))).join('And');
+                let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
+                let callParams = primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ');
+                let callParamNames = '"'+primaryKeys.map(pk => stringUtil.camelize(pk.name)).join('", "')+'"';
+                let methodNameSuffix = primaryKeys.map(pk => stringUtil.upperCamel(stringUtil.camelize(pk.name))).join('And');
                 
                 let vals = [];
                 primaryKeys.forEach(col => {
-                    let upperColumnName = _this.upperCamel(_this.camelize(col.name));
+                    let upperColumnName = stringUtil.upperCamel(stringUtil.camelize(col.name));
                     vals.push(`input.get${upperColumnName}() == null`);
                 });
                 let updateValidation = `if(${vals.join(' || ')})
@@ -444,7 +400,7 @@ ${initFilter}
     /**
      * Retrieves ${upperCamelEntityName} record matching the given primary key.
      *
-     * @param ${primaryKeys.map(pk => this.camelize(pk.name)).join(', ')} the primary key value(s) used for filtering.
+     * @param ${primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ')} the primary key value(s) used for filtering.
      * @return a list of matching ${upperCamelEntityName} entities.
      */
     public ${upperCamelEntityName} get${upperCamelEntityName}(${paramList}) {
@@ -460,7 +416,7 @@ ${initFilter}
     public ${upperCamelEntityName} create${upperCamelEntityName}(${upperCamelEntityName}Input input) {
         ${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(input);
         return ${entityNameCamel}Repository.findOneBy${methodNameSuffix}(
-            ${primaryKeys.map(pk => `saved.get${this.upperCamel(this.camelize(pk.name))}()`).join(', ')}
+            ${primaryKeys.map(pk => `saved.get${stringUtil.upperCamel(stringUtil.camelize(pk.name))}()`).join(', ')}
         );
     }
 
@@ -473,14 +429,14 @@ ${initFilter}
     public ${upperCamelEntityName} update${upperCamelEntityName}(${upperCamelEntityName}Input input) {
         ${updateValidation}${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(input);
         return ${entityNameCamel}Repository.findOneBy${methodNameSuffix}(
-            ${primaryKeys.map(pk => `saved.get${this.upperCamel(this.camelize(pk.name))}()`).join(', ')}
+            ${primaryKeys.map(pk => `saved.get${stringUtil.upperCamel(stringUtil.camelize(pk.name))}()`).join(', ')}
         );
     }
 
     /**
      * Deletes the {@link ${upperCamelEntityName}} record that matches the given primary key(s).
      *
-     * @param ${primaryKeys.map(pk => this.camelize(pk.name)).join(', ')} the primary key value(s) of the record to delete.
+     * @param ${primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ')} the primary key value(s) of the record to delete.
      */
     @Transactional
     public void delete${upperCamelEntityName}(${paramList}) {
@@ -718,7 +674,7 @@ public class DataOrder {
         // Periksa kolom di entitas utama
         entity.columns.forEach(col => {
             if (this.isForeignKey(entities, entity, col) && !isCompositeKey) {
-                let relationName = this.camelize(col.name.replace(/_id$/i, ""));
+                let relationName = stringUtil.camelize(col.name.replace(/_id$/i, ""));
                 let fullPath = prefix ? `${prefix}.${relationName}` : relationName;
                 relations.push(fullPath);
 
@@ -732,7 +688,7 @@ public class DataOrder {
         
         entity.columns.forEach(col => {
             if (isCompositeKey) {
-                let relationName = this.camelize(col.name.replace(/_id$/i, ""));
+                let relationName = stringUtil.camelize(col.name.replace(/_id$/i, ""));
                 let fullPath = prefix ? `${prefix}.${relationName}` : relationName;
                 relations.push(fullPath);
 
@@ -758,8 +714,8 @@ public class DataOrder {
         let _this = this;
 
         entities.forEach(entity => {
-            let entityNameCamel = this.camelize(entity.name);
-            let upperCamelEntityName = this.upperCamel(entityNameCamel);
+            let entityNameCamel = stringUtil.camelize(entity.name);
+            let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
             let primaryKeys = this.getPrimaryKeys(entity);
 
             if (primaryKeys.length > 0) {
@@ -767,8 +723,8 @@ public class DataOrder {
                     ? `${upperCamelEntityName}Id`
                     : this.getJavaType(primaryKeys[0].type);
 
-                let methodNameSuffix = primaryKeys.map(pk => this.upperCamel(this.camelize(pk.name))).join('And');
-                let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${this.camelize(pk.name)}`).join(', ');
+                let methodNameSuffix = primaryKeys.map(pk => stringUtil.upperCamel(stringUtil.camelize(pk.name))).join('And');
+                let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
 
                 let javaLangTypes = ["String", "Long", "Integer", "Double", "Float", "Boolean", "Character", "Byte", "Short"];
                 let pkTypeImport = "";
@@ -784,7 +740,7 @@ public class DataOrder {
 
                 let entityGraphAnnotation = "";
                 if (relations.length > 0 || (primaryKeys.length > 1)) {
-                    entityGraphAnnotation = `    @EntityGraph(attributePaths = { ${relations.map(r => `"${r}"`).join(', ')} })\n`;
+                    entityGraphAnnotation = `    @EntityGraph(attributePaths = { ${relations.map(r => `"${r}"`).join(', ')} })\n`; // NOSONAR
                 }
 
                 // === 1. Repository utama ===
@@ -855,8 +811,8 @@ public interface ${upperCamelEntityName}InputRepository extends JpaRepository<${
 
         entities.forEach(entity => {
             let entityName = entity.name;
-            let upperCamelEntityName = this.upperCamel(this.camelize(entityName));
-            let entityNameSnake = this.snakeize(entityName);
+            let upperCamelEntityName = stringUtil.upperCamel(stringUtil.camelize(entityName));
+            let entityNameSnake = stringUtil.snakeize(entityName);
             let primaryKeys = this.getPrimaryKeys(entity);
 
             // === 1. Entity utama ===
@@ -905,11 +861,11 @@ import lombok.Getter;
 
         entity.columns.forEach(column => {
             let columnName = column.name;
-            let columnCamelName = this.camelize(columnName);
+            let columnCamelName = stringUtil.camelize(columnName);
             let columnType = column.type;
             let columnJavaType = this.getJavaType(columnType);
             let objectName = columnCamelName.substring(0, columnCamelName.length - 2);
-            let objectType = this.upperCamel(objectName);
+            let objectType = stringUtil.upperCamel(objectName);
 
             if (column.primaryKey) {
                 entityContent += `    @Id
@@ -1020,7 +976,7 @@ import lombok.Getter;
 
         entity.columns.forEach(column => {
             let columnName = column.name;
-            let columnCamelName = this.camelize(columnName);
+            let columnCamelName = stringUtil.camelize(columnName);
             let columnType = column.type;
             let columnJavaType = this.getJavaType(columnType);
 
@@ -1303,7 +1259,7 @@ public class PageUtil {
         this.model.entities.forEach(entity => {
             let primaryKeys = this.getPrimaryKeys(entity);
             if (primaryKeys.length > 1) {
-                let idClassName = `${this.upperCamel(this.camelize(entity.name))}Id`;
+                let idClassName = `${stringUtil.upperCamel(stringUtil.camelize(entity.name))}Id`;
                 let content = `package ${this.packageName}.entity;
 
 import java.io.Serializable;
@@ -1322,7 +1278,7 @@ public class ${idClassName} implements Serializable {
 
 `;
                 primaryKeys.forEach(pk => {
-                    let pkNameCamel = this.camelize(pk.name);
+                    let pkNameCamel = stringUtil.camelize(pk.name);
                     let pkJavaType = this.getJavaType(pk.type);
                     
                     
@@ -1346,12 +1302,12 @@ public class ${idClassName} implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ${idClassName} that = (${idClassName}) o;
-        return ${primaryKeys.map(pk => `Objects.equals(${this.camelize(pk.name)}, that.${this.camelize(pk.name)})`).join(' && ')};
+        return ${primaryKeys.map(pk => `Objects.equals(${stringUtil.camelize(pk.name)}, that.${stringUtil.camelize(pk.name)})`).join(' && ')};
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(${primaryKeys.map(pk => this.camelize(pk.name)).join(', ')});
+        return Objects.hash(${primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ')});
     }
 
 `;
@@ -1529,307 +1485,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
     }
     
     
-    /**
-     * Checks whether the given buffer starts with the standard SQLite file header.
-     * SQLite database files begin with the following 16-byte header: "SQLite format 3\0".
-     *
-     * @param {Uint8Array} buffer - The byte buffer to check.
-     * @returns {boolean} - Returns true if the buffer matches the SQLite header signature.
-     */
-    looksLikeSQLite(buffer) {
-        const sqliteHeader = [
-            0x53, 0x51, 0x4C, 0x69,
-            0x74, 0x65, 0x20, 0x66,
-            0x6F, 0x72, 0x6D, 0x61,
-            0x74, 0x20, 0x33, 0x00
-        ];
-        return sqliteHeader.every((byte, i) => buffer[i] === byte);
-    }
     
     
-    /**
-     * Imports a SQLite database file and extracts table structures and data using SQL.js.
-     * Converts each table into an Entity with MySQL-compatible column definitions and populates its 'data' property.
-     *
-     * @param {File} file - The SQLite database file to import.
-     * @param {Function} [callback] - Optional callback function to invoke after import is complete.
-     * @returns {void}
-     */
-    importSQLite(file, callback) {
-        if (!file) {
-            return; // Exit if no file is selected
-        }
-        let _this = this;
-        const reader = new FileReader(); // Create a FileReader object
-        reader.onload = function (event) {
-            const arrayBuffer = event.target.result; // Get file data as an ArrayBuffer
-            const uint8Array = new Uint8Array(arrayBuffer); // Convert ArrayBuffer to Uint8Array
-
-            // Initialize SQL.js and load the database
-            initSqlJs({ locateFile: file => `wasm/sql-wasm.wasm` }).then(SQL => {
-                _this.db = new SQL.Database(uint8Array); // Create a new database instance
-
-                // Get the names of all tables in the database
-                let res1 = _this.db.exec("SELECT name FROM sqlite_master WHERE type='table';");
-                let importedEntities = [];
-                res1[0].values.forEach((row, index) => {
-                    const tableName = row[0]; // Extract table name
-                    let entity = new Entity(_this.snakeize(tableName), index);
-
-                    // --- Start: Add data import capability ---
-                    let tableData = _this.db.exec(`SELECT * FROM ${tableName};`);
-                    if (tableData.length > 0) {
-                        // Assuming tableData[0].columns contains column names and tableData[0].values contains rows
-                        const columns = tableData[0].columns;
-                        const values = tableData[0].values;
-
-                        entity.creationDate = (new Date()).getTime();
-                        entity.modificationDate = entity.creationDate;
-                        entity.creator = '{{userName}}'; // Replace with actual user name if available
-                        entity.modifier = '{{userName}}'; // Replace with actual user name if available
-
-                        // Map array of values to array of objects for easier access
-                        entity.data = values.map(rowValues => /*NOSONAR*/ {
-                            const rowObject = {};
-                            columns.forEach((colName, colIndex) => {
-                                const snakeKey = _this.snakeize(colName);
-                                rowObject[snakeKey] = rowValues[colIndex];
-                            });
-                            return rowObject;
-                        });
-                    } else {
-                        entity.setData(null); // If no data, initialize as null
-                    }
-                    // --- End: Add data import capability ---
-
-                    let tableInfo = _this.db.exec(`PRAGMA table_info(${tableName});`); // Get table info
-                    if (tableInfo.length > 0) {
-                        tableInfo[0].values.forEach(columnInfo => /*NOSONAR*/{
-                             
-                            let isAutoIncrement = columnInfo[2].toUpperCase() == 'INTEGER' && columnInfo[5];
-                            
-                            const column = new Column(
-                                _this.snakeize(columnInfo[1]), // The name of the column.
-                                _this.toMySqlType(columnInfo[2]), // The SQL data type of the column (e.g., "VARCHAR", "INT", "ENUM").
-                                _this.getColumnSize(columnInfo[2]), // The length or precision of the column (e.g., "255" for VARCHAR, or "10,2" for DECIMAL). Optional.
-                                columnInfo[3] === 1, // Indicates whether the column allows NULL values.
-                                columnInfo[4], // The default value assigned to the column. Optional.
-                                columnInfo[5], // Specifies whether the column is a primary key.
-                                isAutoIncrement, // Indicates if the column value auto-increments (typically used for numeric primary keys).
-                                null, // Valid values for ENUM/SET types, or value range for numeric types (comma-separated). Optional.
-                            );
-                            // Add the column to the entity
-                            entity.addColumn(column);
-                        });
-                        importedEntities.push(entity); // Add the entity to the imported entities
-                    }
-                });
-
-                if (typeof callback === 'function') {
-                    callback({entities: importedEntities}); // Execute callback with the updated entities
-                }
-
-            });
-        };
-        reader.readAsArrayBuffer(file); // Read the selected file
-    }
-    
-    /**
-     * Imports an SQL file, translates its content to MySQL-compatible syntax, parses the table structures and data,
-     * and updates the entity editor with the parsed entities and rows.
-     *
-     * @param {File} file - The SQL file to be imported.
-     * @param {Function} [callback] - Optional callback to execute after the import process is completed.
-     * @returns {void}
-     */
-    importSQLQuery(file, callback) {
-        let _this = this;
-        const reader = new FileReader(); // Initialize FileReader to read the file contents
-
-        reader.onload = function (e) {
-            let contents = e.target.result; // Extract text content from the file
-
-            try {
-                const translator = new SQLConverter(); // Create an instance to handle SQL dialect conversion
-                const translatedContents = translator.translate(contents, 'mysql').replace(/`/g, ''); // Translate and clean backticks
-
-                const tableParser = new TableParser(translatedContents); // Parse translated SQL structure (CREATE TABLE)
-                tableParser.parseData(contents); // Parse original SQL content (INSERT INTO) to extract row data
-
-                const importedEntities = _this.createEntitiesFromSQL(tableParser.tableInfo); // Convert table structures into editor entities
-
-                if (typeof callback === 'function') {
-                    callback({entities: importedEntities}); // Invoke callback with updated entity list
-                }
-
-            } catch (err) {
-                console.log("Error parsing SQL: " + err.message); // Log error if parsing fails
-            }
-        };
-
-        reader.onerror = () => {
-            
-        };
-
-        reader.readAsText(file); // Begin reading the file as plain text
-    }
-    
-    /**
-     * Creates an array of Entity instances from the given SQL table data.
-     * 
-     * This method takes in an array of tables, each containing information about table columns, and converts that 
-     * data into Entity and Column objects. It then returns an array of the created entities.
-     *
-     * @param {Array} tables - An array of tables (each table being an object) with column data to convert into entities.
-     * Each table should contain a `tableName` and a `columns` array where each column object contains metadata about the column (e.g., Field, Type, Length, Nullable, etc.).
-     * 
-     * @returns {Array} entities - An array of Entity objects, each containing Column objects based on the provided table data.
-     */
-    createEntitiesFromSQL(tables) {
-        const entities = [];
-
-        // Iterate over each entity in the JSON data
-        tables.forEach((table, index) => {
-            // Create a new Entity instance
-            let entity = new Entity(table.tableName, index);
-            
-            // Iterate over each column in the entity's columns array
-            table.columns.forEach(columnData => {
-                // Create a new Column instance
-                const column = new Column(
-                    columnData.Field,
-                    columnData.Type.toUpperCase(),
-                    columnData.Length,
-                    columnData.Nullable,
-                    columnData.Default,
-                    columnData.Key,
-                    columnData.AutoIncrement,
-                    (columnData.EnumValues != null && typeof columnData.EnumValues == 'object') ? columnData.EnumValues.join(', ') : null,
-                    null
-                );
-                
-                // Add the column to the entity
-                entity.addColumn(column);
-            });
-
-            entity.creationDate = (new Date()).getTime();
-            entity.modificationDate = entity.creationDate;
-            entity.creator = '{{userName}}'; // Replace with actual user name if available
-            entity.modifier = '{{userName}}'; // Replace with actual user name if available
-
-            // Add the entity to the entities array
-            entities.push(entity);
-        });
-
-        return entities;
-    };
     
     
-    /**
-     * Imports an SQL file and processes its content.
-     * 
-     * This function accepts an SQL file, reads its contents as text using a FileReader, then parses it 
-     * using a `TableParser` and updates the editor's entities with the parsed data. After the import, 
-     * a callback function is invoked with the updated entities, if provided.
-     * 
-     * @param {File} file - The SQL file object to be imported.
-     * @param {Function} [callback] - Optional callback function to be executed after the entities are updated. 
-     *                                The callback will receive the updated entities as its argument.
-     * @returns {void} - This function does not return a value.
-     */
-    importSQLFile(file, callback) {
-        const _this = this;
-        const reader = new FileReader();
-
-        // Baca 512 byte pertama
-        const blob = file.slice(0, 512);
-        reader.onload = function (e) {
-            const buffer = new Uint8Array(e.target.result);
-            if (_this.looksLikeSQLite(buffer)) {
-                _this.importSQLite(file, callback);
-            } else {
-                _this.importSQLQuery(file, callback);
-            }
-        };
-
-        reader.onerror = () => {};
-        reader.readAsArrayBuffer(blob);
-    }
-    
-    /**
-     * Converts SQLite data type to MySQL equivalent without length or default values.
-     * The mapping is done in order of priority using a predefined list of patterns.
-     * 
-     * @param {string} sqliteType - The original SQLite column type.
-     * @returns {string} - Corresponding MySQL data type.
-     */
-    toMySqlType(sqliteType) {
-        if (!sqliteType) return 'TEXT';
-
-        const type = sqliteType.trim().toUpperCase();
-
-        // Ordered map of patterns to MySQL types
-        const typeMap = [
-            [/NVARCHAR/, "VARCHAR"],
-            [/INT/, "BIGINT"],
-            [/(CHAR|CLOB|TEXT)/, "TEXT"],
-            [/BLOB/, "BLOB"],
-            [/(REAL|FLOA|DOUB)/, "DOUBLE"],
-            [/(NUMERIC|DECIMAL)/, "DECIMAL"],
-            [/BOOLEAN/, "TINYINT"],
-            [/TIMESTAMP/, "TIMESTAMP"],
-            [/(DATE|TIME)/, "DATETIME"]
-        ];
-
-        for (const [pattern, mysqlType] of typeMap) {
-            if (pattern.test(type)) {
-                return mysqlType;
-            }
-        }
-
-        return sqliteType; // Default fallback
-    }
-    
-    /**
-     * Extracts size/length value from a SQLite column type.
-     * 
-     * @param {string} sqliteType - The original SQLite column type.
-     * @returns {number|null} - The size if available, otherwise null.
-     */
-    getColumnSize(sqliteType) {
-        if (!sqliteType) return null;
-
-        if(sqliteType.toUpperCase().indexOf('BOOL') !== -1)
-        {
-            return 1; // Boolean types are typically 1 byte in MySQL
-        }
-
-        const match = sqliteType.match(/\((\d+)\)/); // NOSONAR
-        if (match && match[1]) /*NOSONAR*/ {
-            return parseInt(match[1]);
-        }
-        return null;
-    }
-    
-    /**
-     * Converts a string (e.g., file or sheet name) into a valid entity/table name.
-     *
-     * This function ensures the result is compatible with database naming conventions by:
-     * - Removing file extensions (e.g., `.csv`, `.xlsx`).
-     * - Replacing non-alphanumeric characters with underscores.
-     * - Converting the entire string to lowercase.
-     * - Trimming leading and trailing underscores.
-     *
-     * @param {string} str - The original name (e.g., file name or sheet name).
-     * @returns {string} A sanitized and valid table name in lowercase with underscores.
-     */
-    toValidTableName(str) {
-        return str
-            .replace(/\.[^/.]+$/, '') // NOSONAR
-            .replace(/[^a-zA-Z0-9]+/g, '_') // NOSONAR
-            .toLowerCase()
-            .replace(/^_+|_+$/g, ''); // NOSONAR
-    }
     
     /**
      * Converts a given SQL data type string to its equivalent Java data type string.
@@ -1885,7 +1544,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
         if (dataType == null) {
             return "partial";
         }
-        switch (dataType)
+        switch (dataType) // NOSONAR
         {
             case "String":
                 return "partial";
