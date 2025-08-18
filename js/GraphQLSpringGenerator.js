@@ -188,7 +188,7 @@ server.port=${appConfig.port || 8080}
 # Database configuration
 spring.datasource.url=${databaseConfig.url || 'jdbc:mysql://localhost:3306/mydb'}
 spring.datasource.username=${databaseConfig.username || 'root'}
-spring.datasource.password=${databaseConfig.password || ''} 
+spring.datasource.password=${databaseConfig.password || ''}
 spring.datasource.driver-class-name=${databaseConfig.driver || 'com.mysql.cj.jdbc.Driver'}
 # JPA/Hibernate configuration
 spring.jpa.show-sql=${databaseConfig.showSql || 'true'}
