@@ -1235,11 +1235,11 @@ public class FetchProperties {
 			return dataOrder;
 		}
 		List<DataOrder> result = new ArrayList<>();
-		for(DataOrder order : dataOrder)
+		for(DataOrder item : dataOrder)
 		{
-			if(this.inList(order))
+			if(this.inList(item))
 			{
-				result.add(order);
+				result.add(item);
 			}
 		}
 		
