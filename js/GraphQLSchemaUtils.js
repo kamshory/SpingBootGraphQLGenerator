@@ -265,10 +265,24 @@ class GraphQLSchemaUtils {
 
 `;
         }
+        else
+        {
+            schema += `type PageInfo {
+    totalCount: Int!
+    totalPages: Int!
+    currentPage: Int!
+    pageSize: Int!
+    hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+}
+    
+`;
+        }
         
         // Generate TYPE definitions
         entities.forEach(entity => {
             let typeName = this.toUpperCamelCase(entity.name);
+            let typeNameLower = this.toCamelCase(entity.name);
             schema += `\ntype ${typeName} {\n`;
 
             const primaryKeys = entity.columns.filter(col => col.primaryKey);
@@ -340,6 +354,18 @@ type ${edgeTypeName} {
     node: ${typeName}
     cursor: String!
 }
+`;
+            }
+            else
+            {
+                const connectionTypeName = `${typeName}Connection`;
+                
+                schema += `
+type ${connectionTypeName} {
+    pageInfo: PageInfo!
+    data: [${typeName}]
+}
+
 `;
             }
         });
@@ -418,7 +444,7 @@ type ${edgeTypeName} {
             const allQueryName = `get${this.toUpperCamelCase(pluralName)}`;
 
             if (paginationMode === "offset") {
-                 schema += `    ${allQueryName}(pageNumber: Int, pageSize: Int, dataFilter: [DataFilter], dataOrder: [DataOrder]): [${typeName}]\n`;
+                 schema += `    ${allQueryName}(pageNumber: Int, pageSize: Int, dataFilter: [DataFilter], dataOrder: [DataOrder]): ${typeName}Connection\n`;
             } else if (paginationMode === "cursor") {
                 schema += `    ${allQueryName}(first: Int, after: String, last: Int, before: String): ${typeName}Connection\n`;
             }
