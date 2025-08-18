@@ -1,6 +1,3 @@
-/**
- * A utility class for parsing GraphQL schema strings and normalizing entity data.
- */
 class GraphQLSchemaUtils {
 
     /**
@@ -8,7 +5,7 @@ class GraphQLSchemaUtils {
      * @type {string[]}
      * An array of reserved GraphQL scalar types.
      */
-    static reservedTypes = [
+    reservedTypes = [
         'String',
         'Int',
         'Float',
@@ -22,7 +19,7 @@ class GraphQLSchemaUtils {
      * @param {string} str The input string.
      * @returns {string} The string in snake_case.
      */
-    static toSnakeCase(str) {
+    toSnakeCase(str) {
         // This regex now correctly handles the first letter, preventing a leading underscore.
         return str.replace(/([A-Z])/g, (match, p1, offset) => {
             // Only add an underscore if it's not the first character
@@ -36,8 +33,19 @@ class GraphQLSchemaUtils {
      * @param {string} str The input string.
      * @returns {string} The string in camelCase.
      */
-    static toCamelCase(str) {
+    toCamelCase(str) {
         return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    }
+
+    /**
+     * @private
+     * Converts a string to PascalCase (UpperCamelCase).
+     * @param {string} name The input string.
+     * @returns {string} The string in PascalCase.
+     */
+    toUpperCamelCase(name) {
+        let camel = this.toCamelCase(name);
+        return camel.charAt(0).toUpperCase() + camel.slice(1);
     }
 
     /**
@@ -46,7 +54,7 @@ class GraphQLSchemaUtils {
      * @param {string} name The name to normalize.
      * @returns {string} The normalized name.
      */
-    static normalizeNameForComparison(name) {
+    normalizeNameForComparison(name) {
         return name.replace(/[_\s]/g, '').toLowerCase();
     }
 
@@ -59,7 +67,7 @@ class GraphQLSchemaUtils {
      * @param {string} [mode="snake"] - The desired naming convention for names ("snake" or "camel").
      * @returns {object} The normalized entities object.
      */
-    static normalizeEntity(entities, mode = "snake") {
+    normalizeEntity(entities, mode = "snake") {
         const normalizedEntities = {};
 
         for (const [entityName, columns] of Object.entries(entities)) {
@@ -131,7 +139,7 @@ class GraphQLSchemaUtils {
      * @param {string} schemaString The GraphQL schema string to parse.
      * @returns {object} An object containing all parsed types and input definitions.
      */
-    static parseGraphQLSchema(schemaString) {
+    parseGraphQLSchema(schemaString) {
         const parsedSchema = {
             types: {},
             inputs: {}
@@ -207,6 +215,7 @@ class GraphQLSchemaUtils {
      * - {boolean} [primaryKey=false] - Whether the column is a primary key.
      * @param {boolean} [removeIdFields=true] - If true, removes raw `_id` scalar fields
      * when a relationship field is generated for that column.
+     * @param {string} [paginationMode="offset"] - The pagination mode to use ("offset" or "cursor").
      *
      * @returns {string} A complete GraphQL schema as a string, including type definitions,
      * input types, and the root Query type for all entities.
@@ -215,73 +224,59 @@ class GraphQLSchemaUtils {
      * const schema = buildGraphQLSchema(entities, false);
      * console.log(schema);
      */
-    static buildGraphQLSchema(entities, removeIdFields = true) {
+    buildGraphQLSchema(entities, removeIdFields = true, paginationMode = "offset") {
         const sqlToGraphQL = {
-            CHAR: "String", 
-            VARCHAR: "String", 
-            TEXT: "String", 
+            CHAR: "String",
+            VARCHAR: "String",
+            TEXT: "String",
             LONGTEXT: "String",
-            INT: "Int", 
-            INTEGER: "Int", 
-            BIGINT: "Int", 
-            SMALLINT: "Int", 
+            INT: "Int",
+            INTEGER: "Int",
+            BIGINT: "Int",
+            SMALLINT: "Int",
             TINYINT: "Boolean",
-            DECIMAL: "Float", 
-            NUMERIC: "Float", 
-            FLOAT: "Float", 
-            DOUBLE: "Float", 
+            DECIMAL: "Float",
+            NUMERIC: "Float",
+            FLOAT: "Float",
+            DOUBLE: "Float",
             REAL: "Float",
             BOOLEAN: "Boolean",
-            DATE: "String", 
-            DATETIME: "String", 
-            TIMESTAMP: "String", 
+            DATE: "String",
+            DATETIME: "String",
+            TIMESTAMP: "String",
             TIME: "String",
-            ENUM: "String", 
+            ENUM: "String",
             SET: "String"
         };
-
-        const toCamelCase = name =>
-            name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-        const toUpperCamelCase = name => {
-            let camel = toCamelCase(name);
-            return camel.charAt(0).toUpperCase() + camel.slice(1);
-        };
+        
+        const toCamelCase = this.toCamelCase;
+        const toUpperCamelCase = this.toUpperCamelCase;
 
         let schema = `# GraphQL Schema generated by GraphQL Generator\n\n`;
+        
+        // Add standard PageInfo and Connection types for cursor-based pagination
+        if (paginationMode === "cursor") {
+            schema += `type PageInfo {
+    hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+    startCursor: String!
+    endCursor: String!
+}
 
+`;
+        }
+        
         // Generate TYPE definitions
         entities.forEach(entity => {
-            let typeName = toUpperCamelCase(entity.name);
+            let typeName = this.toUpperCamelCase(entity.name);
             schema += `\ntype ${typeName} {\n`;
 
             const primaryKeys = entity.columns.filter(col => col.primaryKey);
             const isCompositeKey = primaryKeys.length > 1;
         
-
             entity.columns.forEach(col => /*NOSONAR*/ {
                 let isRelation = false;
                 let isRequired = false;
-
-                
-                // Non-nullable relationships are always required
-                if (isRelation && !col.nullable) {
-                    isRequired = true;
-                }
-
-                // Non-key, non-nullable columns are also required
-                if (isCompositeKey && col.primaryKey) {
-                    isRequired = true;
-                }
-                
-                if(col.primaryKey)
-                {
-                    isRequired = true;
-                }
-
-                // Non-key, non-nullable columns are also required
-                if (!col.primaryKey && !isRelation && !col.nullable) {
-                    isRequired = true;
-                }
 
                 if (col.name.endsWith("_id")) {
                     const relatedEntityName = col.name.slice(0, -3);
@@ -290,11 +285,26 @@ class GraphQLSchemaUtils {
                     );
 
                     if (relatedEntity && relatedEntity.name.toLowerCase() !== entity.name.toLowerCase()) {
-                        const relType = toUpperCamelCase(relatedEntity.name);
+                        const relType = this.toUpperCamelCase(relatedEntity.name);
                         const relField = toCamelCase(relatedEntity.name);
                         schema += `    ${relField}: ${relType}${col.nullable ? "" : "!"}\n`;
                         isRelation = true;
                     }
+                }
+                
+                // Non-nullable relationships are always required
+                if (isRelation && !col.nullable) {
+                    isRequired = true;
+                }
+
+                // Primary keys are always required
+                if (col.primaryKey) {
+                    isRequired = true;
+                }
+
+                // Non-key, non-nullable columns are also required
+                if (!col.primaryKey && !isRelation && !col.nullable) {
+                    isRequired = true;
                 }
 
                 if (!(removeIdFields && isRelation)) {
@@ -314,11 +324,29 @@ class GraphQLSchemaUtils {
             });
 
             schema += `}\n`;
+            
+            // Generate Connection and Edge types for cursor-based pagination
+            if (paginationMode === "cursor") {
+                const connectionTypeName = `${typeName}Connection`;
+                const edgeTypeName = `${typeName}Edge`;
+                
+                schema += `
+type ${connectionTypeName} {
+    edges: [${edgeTypeName}]
+    pageInfo: PageInfo!
+}
+
+type ${edgeTypeName} {
+    node: ${typeName}
+    cursor: String!
+}
+`;
+            }
         });
 
         // Generate INPUT definitions
         entities.forEach(entity => {
-            let inputName = toUpperCamelCase(entity.name) + "Input";
+            let inputName = this.toUpperCamelCase(entity.name) + "Input";
             schema += `\ninput ${inputName} {\n`;
 
             const primaryKeys = entity.columns.filter(col => col.primaryKey);
@@ -329,7 +357,7 @@ class GraphQLSchemaUtils {
                     col.name.endsWith("_id") &&
                     entities.some(
                         e => e.name.toLowerCase() === col.name.slice(0, -3).toLowerCase() &&
-                            e.name.toLowerCase() !== entity.name.toLowerCase()
+                                e.name.toLowerCase() !== entity.name.toLowerCase()
                     );
 
                 let gqlType;
@@ -364,12 +392,10 @@ class GraphQLSchemaUtils {
     orderType: String
 }\n`;
 
-        
-
         // Add Query block
         schema += `\ntype Query {\n`;
         entities.forEach(entity => {
-            const typeName = toUpperCamelCase(entity.name);
+            const typeName = this.toUpperCamelCase(entity.name);
             const camelCaseName = toCamelCase(entity.name);
             
             // Find all primary key columns
@@ -387,20 +413,22 @@ class GraphQLSchemaUtils {
                 schema += `    ${singleQueryName}(${primaryKeyArgs}): ${typeName}\n`;
             }
 
-            // Add a query for all entities
+            // Add a query for all entities with pagination arguments
             const pluralName = `${camelCaseName}s`;
-            const allQueryName = `get${toUpperCamelCase(pluralName)}`;
+            const allQueryName = `get${this.toUpperCamelCase(pluralName)}`;
 
-            schema += `    ${allQueryName}(pageNumber: Int, pageSize: Int, dataFilter: [DataFilter], dataOrder: [DataOrder]): [${typeName}]\n`;
+            if (paginationMode === "offset") {
+                 schema += `    ${allQueryName}(pageNumber: Int, pageSize: Int, dataFilter: [DataFilter], dataOrder: [DataOrder]): [${typeName}]\n`;
+            } else if (paginationMode === "cursor") {
+                schema += `    ${allQueryName}(first: Int, after: String, last: Int, before: String): ${typeName}Connection\n`;
+            }
         });
         schema += `}\n`;
         
-
-        // Tambahan di bagian akhir fungsi sebelum return schema
         // Add Mutation block
         schema += `\ntype Mutation {\n`;
         entities.forEach(entity => {
-            const typeName = toUpperCamelCase(entity.name);
+            const typeName = this.toUpperCamelCase(entity.name);
             const camelCaseName = toCamelCase(entity.name);
             const inputName = `${typeName}Input`;
 
@@ -421,8 +449,6 @@ class GraphQLSchemaUtils {
         });
         schema += `}\n`;
         
-
-
         return schema;
     }
 }

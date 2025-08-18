@@ -223,7 +223,7 @@ spring.application.version=${this.version}
     entities.forEach(entity => {
         let entityName = entity.name;
         let entityNameCamel = stringUtil.camelize(entityName);
-        let upperCamelEntityName = (entityNameCamel);
+        let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
         let primaryKeys = this.getPrimaryKeys(entity);
 
         if (primaryKeys.length > 0) {
@@ -1326,7 +1326,7 @@ public class ${idClassName} implements Serializable {
      * @returns {Array} Array containing the GraphQL schema file object.
      */
     generateGraphQlSchema() {
-        let content = GraphQLSchemaUtils.buildGraphQLSchema(this.model.entities, false);
+        let content = util.buildGraphQLSchema(this.model.entities, false);
         return [{ name: "src/main/resources/graphql/schema.graphqls", content: content }];
     }
 
