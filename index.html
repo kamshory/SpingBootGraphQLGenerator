@@ -10,8 +10,8 @@
   <script src="js/Entity.min.js"></script>
   <script src="js/StringUtil.js"></script>
   <script src="js/SQLParser.js"></script>
-  <script src="js/GraphQLSpringGenerator.min.js"></script>
-  <script src="js/GraphQLSchemaUtils.min.js"></script>
+  <script src="js/GraphQLSpringGenerator.js"></script>
+  <script src="js/GraphQLSchemaUtils.js"></script>
   <script src="js/SQLConverter.min.js"></script>
   <script src="js/Maven.min.js"></script>
   <script src="js/TableParser.min.js"></script>
@@ -119,6 +119,7 @@
     let stringUtil = new StringUtil();
     let generator = new GraphQLSpringGenerator();
     let sqlParser = new SQLParser();
+    let util = new GraphQLSchemaUtils();
     document.addEventListener('DOMContentLoaded', () => {
       const form = document.getElementById('configForm');
       form.addEventListener('submit', (event) => {

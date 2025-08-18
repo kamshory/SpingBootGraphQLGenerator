@@ -37,11 +37,14 @@ class GraphQLSpringGenerator {
         files.push(...this.generateIdClassFiles());
         files.push(...this.generateEntityFiles());
         files.push(...this.generateRepositoryFiles());
+        files.push(...this.generateConnectionFiles());
         files.push(...this.generateServiceFiles());
         files.push(...this.generateControllerFiles());
         files.push(...this.generateGraphQlSchema());
+        files.push(...this.generatePageInfoFile());
         files.push(...this.generatePomFile());
         files.push(...this.generateApplicationFile());
+        files.push(...this.generateCorsConfigFile());
         
         files.push(...this.generateDataFilterFile());
         files.push(...this.generateDataOrderFile());
@@ -188,7 +191,7 @@ server.port=${appConfig.port || 8080}
 # Database configuration
 spring.datasource.url=${databaseConfig.url || 'jdbc:mysql://localhost:3306/mydb'}
 spring.datasource.username=${databaseConfig.username || 'root'}
-spring.datasource.password=${databaseConfig.password || ''} 
+spring.datasource.password=${databaseConfig.password || ''}
 spring.datasource.driver-class-name=${databaseConfig.driver || 'com.mysql.cj.jdbc.Driver'}
 # JPA/Hibernate configuration
 spring.jpa.show-sql=${databaseConfig.showSql || 'true'}
@@ -211,6 +214,28 @@ spring.application.version=${this.version}
 `;
         return [{ name: 'src/main/resources/application.properties', content: content }];
     }
+
+    generateCorsConfigFile()
+    {
+        const content = `package ${this.packageName}.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class CorsConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/graphql/**") 
+                .allowedOrigins("*") 
+                .allowedMethods("GET", "POST", "PUT", "DELETE")
+                .allowedHeaders("*");
+    }
+}`;
+        return [{ name: this.createSourceDirectoryFromArtefact(this.packageName) + 'config/CorsConfig.java', content: content }]; 
+    }
     
 
     /**
@@ -223,7 +248,7 @@ spring.application.version=${this.version}
     entities.forEach(entity => {
         let entityName = entity.name;
         let entityNameCamel = stringUtil.camelize(entityName);
-        let upperCamelEntityName = (entityNameCamel);
+        let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
         let primaryKeys = this.getPrimaryKeys(entity);
 
         if (primaryKeys.length > 0) {
@@ -240,6 +265,7 @@ import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.stereotype.Controller;
+import ${this.packageName}.output.${upperCamelEntityName}Connection;
 import ${this.packageName}.utils.DataFilter;
 import ${this.packageName}.utils.DataOrder;
 import ${this.packageName}.entity.${upperCamelEntityName};
@@ -255,7 +281,7 @@ public class ${upperCamelEntityName}Controller {
     private final ${upperCamelEntityName}Service ${entityNameCamel}Service;
 
     @QueryMapping
-    public Page<${upperCamelEntityName}> get${upperCamelEntityName}s(@Argument(name = "pageNumber") Integer pageNumber, @Argument(name = "pageSize") Integer pageSize, @Argument(name = "dataFilter") List<DataFilter> dataFilter, @Argument(name = "dataOrder") List<DataOrder> dataOrder) {
+    public ${upperCamelEntityName}Connection get${upperCamelEntityName}s(@Argument(name = "pageNumber") Integer pageNumber, @Argument(name = "pageSize") Integer pageSize, @Argument(name = "dataFilter") List<DataFilter> dataFilter, @Argument(name = "dataOrder") List<DataOrder> dataOrder) {
         return ${entityNameCamel}Service.get${upperCamelEntityName}s(pageNumber, pageSize, dataFilter, dataOrder);
     }
 
@@ -342,6 +368,7 @@ import lombok.RequiredArgsConstructor;
 
 import ${this.packageName}.entity.${upperCamelEntityName};
 import ${this.packageName}.entity.${upperCamelEntityName}Input;
+import ${this.packageName}.output.${upperCamelEntityName}Connection;
 import ${this.packageName}.repository.${upperCamelEntityName}Repository;
 import ${this.packageName}.repository.${upperCamelEntityName}InputRepository;
 import ${this.packageName}.utils.DataFilter;
@@ -389,12 +416,13 @@ ${initFilter}
      * @param dataOrder A list of fields and their sort order to be applied to the query.
      * @return A {@link Page} object containing the ${upperCamelEntityName} entities that match the criteria.
      */
-    public Page<${upperCamelEntityName}> get${upperCamelEntityName}s(Integer pageNumber, Integer pageSize, List<DataFilter> dataFilter, List<DataOrder> dataOrder) {
+    public ${upperCamelEntityName}Connection get${upperCamelEntityName}s(Integer pageNumber, Integer pageSize, List<DataFilter> dataFilter, List<DataOrder> dataOrder) {
     	List<DataOrder> filteredDataOrder = this.fetchProperties.filterFieldName(dataOrder);
-        return ${entityNameCamel}Repository.findAll(
+        Page<${upperCamelEntityName}> page = ${entityNameCamel}Repository.findAll(
         		SpecificationUtil.createSpecificationFromFilter(dataFilter, this.fetchProperties.getFilter()), 
         		PageUtil.pageRequest(pageNumber, pageSize, filteredDataOrder, ${callParamNames})
         );
+        return new ${upperCamelEntityName}Connection(page);
     }
 
     /**
@@ -701,6 +729,49 @@ public class DataOrder {
 
 
         return relations;
+    }
+
+    /**
+     * Generates repository files for all entities in the model.
+     * Adds @EntityGraph for fetching ManyToOne relationships (nested).
+     * Creates normal repository and Input repository.
+     */
+    generateConnectionFiles() {
+        let entities = this.model.entities;
+        let file = [];
+        let _this = this;
+
+        entities.forEach(entity => {
+            let entityNameCamel = stringUtil.camelize(entity.name);
+            let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
+
+
+                // === 1. Repository utama ===
+                let repositoryContent = `package ${this.packageName}.output;
+
+import org.springframework.data.domain.Page;
+
+import ${this.packageName}.entity.${upperCamelEntityName};
+import ${this.packageName}.utils.PageInfo;
+
+public class ${upperCamelEntityName}Connection
+{
+    private PageInfo pageInfo;
+    private Page<${upperCamelEntityName}> data;
+    public ${upperCamelEntityName}Connection(Page<${upperCamelEntityName}> page)
+    {
+        this.data = page;
+        this.pageInfo = new PageInfo(page);
+    }
+}
+
+`;
+            file.push({
+                name: this.createSourceDirectoryFromArtefact(this.packageName) + `output/${upperCamelEntityName}Connection.java`,
+                content: repositoryContent
+            });
+        });
+        return file;
     }
 
     /**
@@ -1326,8 +1397,46 @@ public class ${idClassName} implements Serializable {
      * @returns {Array} Array containing the GraphQL schema file object.
      */
     generateGraphQlSchema() {
-        let content = GraphQLSchemaUtils.buildGraphQLSchema(this.model.entities, false);
+        let content = util.buildGraphQLSchema(this.model.entities, false);
         return [{ name: "src/main/resources/graphql/schema.graphqls", content: content }];
+    }
+
+    generatePageInfoFile()
+    {
+        const content = `package ${this.packageName}.utils;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import org.springframework.data.domain.Page;
+
+@Setter
+@Getter
+public class PageInfo {
+	Integer totalCount;
+    Integer totalPages;
+    Integer currentPage;
+    Integer pageSize;
+    Boolean hasNextPage; 
+    Boolean hasPreviousPage;
+
+	public PageInfo(Page<?> page)
+	{
+		this.totalCount = page.getNumberOfElements();
+		this.totalPages = page.getTotalPages();
+		this.currentPage = page.getNumber() + 1;
+		this.pageSize = page.getSize();
+		this.hasNextPage = page.hasNext();
+		this.hasPreviousPage = page.hasPrevious();
+	}
+}
+
+
+
+`;      return [{ 
+            name: this.createSourceDirectoryFromArtefact(this.packageName) + `utils/PageInfo.java`,
+            content: content 
+        }];
     }
 
     /**
@@ -1376,6 +1485,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
     <java.version>${config.javaVersion}</java.version>
 </properties>
 <dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
     <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-data-jpa</artifactId>
