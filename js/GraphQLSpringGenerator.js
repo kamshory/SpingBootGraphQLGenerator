@@ -45,6 +45,7 @@ class GraphQLSpringGenerator {
         files.push(...this.generatePomFile());
         files.push(...this.generateApplicationFile());
         files.push(...this.generateCorsConfigFile());
+        files.push(...this.generateRequestInterceptorFile());
         
         files.push(...this.generateDataFilterFile());
         files.push(...this.generateDataOrderFile());
@@ -215,6 +216,47 @@ spring.application.version=${this.version}
         return [{ name: 'src/main/resources/application.properties', content: content }];
     }
 
+    generateRequestInterceptorFile()
+    {
+        const content = `package ${this.packageName}.config;
+
+import java.util.Map;
+
+import org.springframework.graphql.server.WebGraphQlInterceptor;
+import org.springframework.graphql.server.WebGraphQlRequest;
+import org.springframework.graphql.server.WebGraphQlResponse;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+@Component
+public class GraphQLRequestInterceptor implements WebGraphQlInterceptor {
+
+    @Override
+    public Mono<WebGraphQlResponse> intercept(WebGraphQlRequest request, Chain chain) {
+        // Get all headers
+        Map<String, String> headers = request.getHeaders().toSingleValueMap();
+
+        // Get IP address
+        String clientIp = request.getRemoteAddress() != null
+                ? request.getRemoteAddress().getAddress().getHostAddress()
+                : "UNKNOWN";
+
+        // Put it into GraphQLContext
+        request.configureExecutionInput((executionInput, builder) ->
+                builder.graphQLContext(Map.of(
+                        "clientIp", clientIp,
+                        "headers", headers
+                )).build()
+        );
+
+        return chain.next(request);
+    }
+}
+
+`;
+        return [{ name: this.createSourceDirectoryFromArtefact(this.packageName) + 'config/GraphQLRequestInterceptor.java', content: content }]; 
+    }
+
     generateCorsConfigFile()
     {
         const content = `package ${this.packageName}.config;
@@ -260,11 +302,12 @@ public class CorsConfig implements WebMvcConfigurer {
 
 import java.util.List;
 
-import org.springframework.data.domain.Page;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.stereotype.Controller;
+
+
 import ${this.packageName}.output.${upperCamelEntityName}Connection;
 import ${this.packageName}.utils.DataFilter;
 import ${this.packageName}.utils.DataOrder;
@@ -272,7 +315,10 @@ import ${this.packageName}.entity.${upperCamelEntityName};
 import ${this.packageName}.entity.${upperCamelEntityName}Input;
 import ${this.packageName}.service.${upperCamelEntityName}Service;
 
+import graphql.schema.DataFetchingEnvironment;
+
 import lombok.RequiredArgsConstructor;
+
 
 @Controller
 @RequiredArgsConstructor
@@ -281,27 +327,27 @@ public class ${upperCamelEntityName}Controller {
     private final ${upperCamelEntityName}Service ${entityNameCamel}Service;
 
     @QueryMapping
-    public ${upperCamelEntityName}Connection get${upperCamelEntityName}s(@Argument(name = "pageNumber") Integer pageNumber, @Argument(name = "pageSize") Integer pageSize, @Argument(name = "dataFilter") List<DataFilter> dataFilter, @Argument(name = "dataOrder") List<DataOrder> dataOrder) {
+    public ${upperCamelEntityName}Connection get${upperCamelEntityName}s(@Argument(name = "pageNumber") Integer pageNumber, @Argument(name = "pageSize") Integer pageSize, @Argument(name = "dataFilter") List<DataFilter> dataFilter, @Argument(name = "dataOrder") List<DataOrder> dataOrder, DataFetchingEnvironment env) {
         return ${entityNameCamel}Service.get${upperCamelEntityName}s(pageNumber, pageSize, dataFilter, dataOrder);
     }
 
     @QueryMapping
-    public ${upperCamelEntityName} get${upperCamelEntityName}(${paramList}) {
+    public ${upperCamelEntityName} get${upperCamelEntityName}(${paramList}, DataFetchingEnvironment env) {
         return ${entityNameCamel}Service.get${upperCamelEntityName}(${callParams});
     }
 
     @MutationMapping
-    public ${upperCamelEntityName} create${upperCamelEntityName}(@Argument ${upperCamelEntityName}Input input) {
+    public ${upperCamelEntityName} create${upperCamelEntityName}(@Argument ${upperCamelEntityName}Input input, DataFetchingEnvironment env) {
         return ${entityNameCamel}Service.create${upperCamelEntityName}(input);
     }
 
     @MutationMapping
-    public ${upperCamelEntityName} update${upperCamelEntityName}(@Argument ${upperCamelEntityName}Input input) {
+    public ${upperCamelEntityName} update${upperCamelEntityName}(@Argument ${upperCamelEntityName}Input input, DataFetchingEnvironment env) {
         return ${entityNameCamel}Service.update${upperCamelEntityName}(input);
     }
 
     @MutationMapping
-    public Boolean delete${upperCamelEntityName}(${paramList}) {
+    public Boolean delete${upperCamelEntityName}(${paramList}, DataFetchingEnvironment env) {
         ${entityNameCamel}Service.delete${upperCamelEntityName}(${callParams});
         return true;
     }
@@ -376,6 +422,8 @@ import ${this.packageName}.utils.DataOrder;
 import ${this.packageName}.utils.FetchProperties;
 import ${this.packageName}.utils.PageUtil;
 import ${this.packageName}.utils.SpecificationUtil;
+
+
 
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
