@@ -787,14 +787,12 @@ public class DataOrder {
     generateConnectionFiles() {
         let entities = this.model.entities;
         let file = [];
-        let _this = this;
-
         entities.forEach(entity => {
             let entityNameCamel = stringUtil.camelize(entity.name);
             let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
 
 
-                // === 1. Repository utama ===
+                // === 1. Main repository ===
                 let repositoryContent = `package ${this.packageName}.output;
 
 import org.springframework.data.domain.Page;
@@ -862,7 +860,7 @@ public class ${upperCamelEntityName}Connection
                     entityGraphAnnotation = `    @EntityGraph(attributePaths = { ${relations.map(r => `"${r}"`).join(', ')} })\n`; // NOSONAR
                 }
 
-                // === 1. Repository utama ===
+                // === 1. Main repository ===
                 let repositoryContent = `package ${this.packageName}.repository;
 
 import org.springframework.data.domain.Page;
@@ -890,7 +888,7 @@ ${entityGraphAnnotation}    Page<${upperCamelEntityName}> findAll(Specification<
                 content: repositoryContent
             });
 
-            // === 2. Repository versi Input ===
+            // === 2. Input repository ===
             let inputRepositoryContent = `package ${this.packageName}.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -934,7 +932,7 @@ public interface ${upperCamelEntityName}InputRepository extends JpaRepository<${
             let entityNameSnake = stringUtil.snakeize(entityName);
             let primaryKeys = this.getPrimaryKeys(entity);
 
-            // === 1. Entity utama ===
+            // === 1. Main entity ===
             let entityContent = `package ${this.packageName}.entity;
 
 import java.util.Date;
@@ -976,7 +974,7 @@ import lombok.Getter;
 
 `;
 
-        let relationProps = []; // simpan properti relasi
+        let relationProps = []; // save the property of the relation
 
         entity.columns.forEach(column => {
             let columnName = column.name;
@@ -1056,7 +1054,7 @@ import lombok.Getter;
             content: entityContent
         });
 
-        // === 2. Entity Input === (tanpa relasi)
+        // === 2. Input entity === (without relation)
         let entityInputContent = `package ${this.packageName}.entity;
 
 import java.util.Date;
