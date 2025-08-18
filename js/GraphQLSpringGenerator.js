@@ -386,6 +386,8 @@ public class ${upperCamelEntityName}Controller {
                 initFilter += `\t\tthis.fetchProperties.add("${columnName}", "${columnName}", "${dataType}", "${filterType}");\r\n`
             });
 
+            let setIdNull = '';
+
             if (primaryKeys.length > 0) {
                 let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
                 let callParams = primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ');
@@ -396,6 +398,10 @@ public class ${upperCamelEntityName}Controller {
                 primaryKeys.forEach(col => {
                     let upperColumnName = stringUtil.upperCamel(stringUtil.camelize(col.name));
                     vals.push(`input.get${upperColumnName}() == null`);
+                    if(col.primaryKey && col.autoIncrement)
+                    {
+                        setIdNull = `\r\n\t\tinput.set${upperColumnName}(null);`;
+                    }
                 });
                 let updateValidation = `if(${vals.join(' || ')})
     	{
@@ -455,14 +461,16 @@ ${initFilter}
     }
     
     /**
-     * Retrieves a paginated and filtered list of all {@link ${upperCamelEntityName}} records from the database.
-     * This method supports dynamic filtering and ordering based on provided criteria.
+     * Retrieves a paginated and optionally filtered list of {@link ${upperCamelEntityName}} records from the database.
+     * This method supports dynamic filtering and sorting based on the provided criteria,
+     * and wraps the result in an {@link ${upperCamelEntityName}Connection} for pagination support.
      *
-     * @param pageNumber The 1-based page number for pagination.
-     * @param pageSize The number of records to retrieve per page.
-     * @param dataFilter A list of filters to be applied to the query.
-     * @param dataOrder A list of fields and their sort order to be applied to the query.
-     * @return A {@link Page} object containing the ${upperCamelEntityName} entities that match the criteria.
+     * @param pageNumber the 1-based page number for pagination (required).
+     * @param pageSize the number of records to retrieve per page (required).
+     * @param dataFilter an optional list of filters to be applied to the query (may be {@code null} or empty).
+     * @param dataOrder an optional list of fields and their sort order to be applied to the query (may be {@code null} or empty).
+     * @return {@link ${upperCamelEntityName}Connection} object containing the paginated {@link ${upperCamelEntityName}} records
+     *         that match the given filtering and sorting criteria.
      */
     public ${upperCamelEntityName}Connection get${upperCamelEntityName}s(Integer pageNumber, Integer pageSize, List<DataFilter> dataFilter, List<DataOrder> dataOrder) {
     	List<DataOrder> filteredDataOrder = this.fetchProperties.filterFieldName(dataOrder);
@@ -489,7 +497,7 @@ ${initFilter}
      * @param input the ${upperCamelEntityName} entity to be created.
      * @return the saved ${upperCamelEntityName} entity.
      */
-    public ${upperCamelEntityName} create${upperCamelEntityName}(${upperCamelEntityName}Input input) {
+    public ${upperCamelEntityName} create${upperCamelEntityName}(${upperCamelEntityName}Input input) {${setIdNull}
         ${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(input);
         return ${entityNameCamel}Repository.findOneBy${methodNameSuffix}(
             ${primaryKeys.map(pk => `saved.get${stringUtil.upperCamel(stringUtil.camelize(pk.name))}()`).join(', ')}
@@ -800,10 +808,37 @@ import org.springframework.data.domain.Page;
 import ${this.packageName}.entity.${upperCamelEntityName};
 import ${this.packageName}.utils.PageInfo;
 
+/**
+ * A connection wrapper for paginated {@link ${upperCamelEntityName}} results.
+ * <p>
+ * This class encapsulates both the paginated list of {@link ${upperCamelEntityName}} entities
+ * and pagination metadata via {@link PageInfo}.
+ * It is commonly used as a GraphQL-compatible representation of
+ * paginated query results.
+ * </p>
+ */
 public class ${upperCamelEntityName}Connection
 {
+    /**
+     * Pagination metadata, including total records, total pages,
+     * current page number, and page size.
+     */
     private PageInfo pageInfo;
+
+    /**
+     * The underlying paginated data of {@link ${upperCamelEntityName}} entities.
+     */
     private Page<${upperCamelEntityName}> data;
+
+    /**
+     * Constructs a new {@code ${upperCamelEntityName}Connection} from a Spring Data {@link Page}.
+     * <p>
+     * The {@link PageInfo} is initialized from the provided {@link Page}
+     * to represent pagination details.
+     * </p>
+     *
+     * @param page the {@link Page} of {@link ${upperCamelEntityName}} entities to wrap.
+     */
     public ${upperCamelEntityName}Connection(Page<${upperCamelEntityName}> page)
     {
         this.data = page;
