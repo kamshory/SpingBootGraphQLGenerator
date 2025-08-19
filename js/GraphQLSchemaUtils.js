@@ -292,6 +292,8 @@ class GraphQLSchemaUtils {
                 let isRelation = false;
                 let isRequired = false;
 
+                let savedRelation = '';
+
                 if (col.name.endsWith("_id")) {
                     const relatedEntityName = col.name.slice(0, -3);
                     const relatedEntity = entities.find(
@@ -301,7 +303,7 @@ class GraphQLSchemaUtils {
                     if (relatedEntity && relatedEntity.name.toLowerCase() !== entity.name.toLowerCase()) {
                         const relType = this.toUpperCamelCase(relatedEntity.name);
                         const relField = toCamelCase(relatedEntity.name);
-                        schema += `    ${relField}: ${relType}${col.nullable ? "" : "!"}\n`;
+                        savedRelation += `    ${relField}: ${relType}${col.nullable ? "" : "!"}\n`;
                         isRelation = true;
                     }
                 }
@@ -335,6 +337,7 @@ class GraphQLSchemaUtils {
                     
                     schema += `    ${toCamelCase(col.name)}: ${gqlType}\n`;
                 }
+                schema += savedRelation;
             });
 
             schema += `}\n`;
@@ -372,11 +375,50 @@ type ${connectionTypeName} {
 
         // Generate INPUT definitions
         entities.forEach(entity => {
-            let inputName = this.toUpperCamelCase(entity.name) + "Input";
-            schema += `\ninput ${inputName} {\n`;
+
+            let createName = this.toUpperCamelCase(entity.name) + "Create";
+            let updateName = this.toUpperCamelCase(entity.name) + "Update";
 
             const primaryKeys = entity.columns.filter(col => col.primaryKey);
             const isCompositeKey = primaryKeys.length > 1;
+            
+            schema += `\ninput ${createName} {\n`;
+
+
+
+            entity.columns.forEach(col => {
+                if(!col.autoIncrement)
+                {
+                    const isRelation =
+                        col.name.endsWith("_id") &&
+                        entities.some(
+                            e => e.name.toLowerCase() === col.name.slice(0, -3).toLowerCase() &&
+                                    e.name.toLowerCase() !== entity.name.toLowerCase()
+                        );
+
+                    let gqlType;
+                    if (col.primaryKey || isRelation) {
+                        gqlType = "ID";
+                    } else {
+                        gqlType = sqlToGraphQL[col.type.toUpperCase()] || "String";
+                    }
+
+                    const isRequired =
+                        (isCompositeKey && col.primaryKey) ||
+                        (isRelation && !col.nullable) ||
+                        (!col.primaryKey && !isRelation && !col.nullable);
+
+                    if (isRequired) {
+                        gqlType += "!";
+                    }
+
+                    schema += `    ${toCamelCase(col.name)}: ${gqlType}\n`;
+                }
+            });
+
+            schema += `}\n`;
+
+            schema += `\ninput ${updateName} {\n`;
 
             entity.columns.forEach(col => {
                 const isRelation =
@@ -456,14 +498,15 @@ type ${connectionTypeName} {
         entities.forEach(entity => {
             const typeName = this.toUpperCamelCase(entity.name);
             const camelCaseName = toCamelCase(entity.name);
-            const inputName = `${typeName}Input`;
+            const createName = `${typeName}Create`;
+            const updatename = `${typeName}Update`;
 
             // Find all primary key columns
             const primaryKeyCols = entity.columns.filter(c => c.primaryKey);
 
             // Create mutation
-            schema += `    create${typeName}(input: ${inputName}!): ${typeName}\n`;
-            schema += `    update${typeName}(input: ${inputName}!): ${typeName}\n`;
+            schema += `    create${typeName}(input: ${createName}!): ${typeName}\n`;
+            schema += `    update${typeName}(input: ${updatename}!): ${typeName}\n`;
 
             // Delete mutation — pakai semua PK sebagai parameter
             if (primaryKeyCols.length > 0) {
