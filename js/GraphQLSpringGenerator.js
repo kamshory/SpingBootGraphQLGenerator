@@ -15,6 +15,16 @@ class GraphQLSpringGenerator {
         this.model = null;
     }
 
+    setModel(model)
+    {
+        this.model = model;
+    }
+
+    getModel()
+    {
+        return this.model;
+    }
+
     /**
      * Generates all virtual files required for the Spring GraphQL project.
      * Includes entity, repository, service, controller, schema, and pom files.
@@ -78,7 +88,10 @@ class GraphQLSpringGenerator {
         this.javaVersion = config.javaVersion || "21";
         this.version = config.version || "1.0.0";
         this.maxRelationDepth = 3; // Default max depth for nested relations
-        this.model = model;
+        if(model)
+        {
+            this.model = model;
+        }
 
         const loadingMessage = document.getElementById('loading');
         loadingMessage.style.display = 'block';
@@ -192,7 +205,7 @@ server.port=${appConfig.port || 8080}
 # Database configuration
 spring.datasource.url=${databaseConfig.url || 'jdbc:mysql://localhost:3306/mydb'}
 spring.datasource.username=${databaseConfig.username || 'root'}
-spring.datasource.password=${databaseConfig.password || ''}
+spring.datasource.password=${databaseConfig.password /*NOSONAR*/ || ''}
 spring.datasource.driver-class-name=${databaseConfig.driver || 'com.mysql.cj.jdbc.Driver'}
 # JPA/Hibernate configuration
 spring.jpa.show-sql=${databaseConfig.showSql || 'true'}
@@ -465,7 +478,6 @@ public class ${upperCamelEntityName}Controller {
                 initFilter += `\t\tthis.queryPredicateMapping.add("${columnName}", "${columnName}", ${dataType}, ${filterOperation});\r\n`
             });
 
-            let setIdNull = '';
 
             if (primaryKeys.length > 0) {
                 let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
@@ -477,10 +489,6 @@ public class ${upperCamelEntityName}Controller {
                 primaryKeys.forEach(col => {
                     let upperColumnName = stringUtil.upperCamel(stringUtil.camelize(col.name));
                     vals.push(`input.get${upperColumnName}() == null`);
-                    if(col.primaryKey && col.autoIncrement)
-                    {
-                        setIdNull = `\r\n\t\tinput.set${upperColumnName}(null);`;
-                    }
                 });
                 let updateValidation = `if(${vals.join(' || ')})
     	{

@@ -141,6 +141,7 @@ class SQLParser {
                 }
 
                 if (typeof callback === 'function') {
+                    importedEntities = _this.calculateEntityDepth(importedEntities);
                     callback({entities: importedEntities}); // Execute callback with the updated entities
                 }
 
@@ -171,9 +172,10 @@ class SQLParser {
                 const tableParser = new TableParser(translatedContents); // Parse translated SQL structure (CREATE TABLE)
                 tableParser.parseData(contents); // Parse original SQL content (INSERT INTO) to extract row data
 
-                const importedEntities = _this.createEntitiesFromSQL(tableParser.tableInfo); // Convert table structures into editor entities
+                let importedEntities = _this.createEntitiesFromSQL(tableParser.tableInfo); // Convert table structures into editor entities
 
                 if (typeof callback === 'function') {
+                    importedEntities = _this.calculateEntityDepth(importedEntities);
                     callback({entities: importedEntities}); // Invoke callback with updated entity list
                 }
 
@@ -343,5 +345,133 @@ class SQLParser {
             .replace(/[^a-zA-Z0-9]+/g, '_') // NOSONAR
             .toLowerCase()
             .replace(/^_+|_+$/g, ''); // NOSONAR
+    }
+
+    /**
+     * Calculates the module creation order based on dependencies (fields ending with `_id`).
+     *
+     * This function traverses the entities to build a dependency graph. It then uses a
+     * Depth-First Search (DFS) algorithm to determine the "depth" of each module,
+     * where depth represents its position in the dependency chain. Modules with no
+     * dependencies have a lower initial depth.
+     *
+     * @param {Array<Object>} entities - A list of entity objects, each expected to have
+     * a `name` property (string) and a `columns` property (array of objects).
+     * Each column object should have a `name` property (string).
+     * @param {boolean} [reverse=false] - If true, modules with no dependencies will have
+     * the highest depth, and modules with the most dependencies will have a depth of 0.
+     * If false (default), modules with no dependencies will have a depth of 1, and
+     * depth increases with more dependencies.
+     * @returns {Array<Object>} - The original list of entities, with an added `depth`
+     * property (number) for each entity, indicating its calculated dependency depth.
+     */
+    calculateEntityDepth(entities, reverse = false) {
+        // Create a quick lookup map from entity name to the entity object for efficient access.
+        const nameToEntity = Object.fromEntries(entities.map(e => [e.name, e]));
+
+        // Build the dependency graph: node -> parent dependencies.
+        // A 'parent' is an entity that the current entity depends on (via an `_id` field).
+        const graph = {};
+        for (const entity of entities) {
+            // Identify references by filtering columns ending with '_id' and removing the suffix.
+            // Ensure the reference is not to itself and exists in the provided entities.
+            const references = entity.columns
+            .filter(col => col.name.endsWith('_id'))
+            .map(col => col.name.replace(/_id$/, ''))
+            .filter(ref => ref !== entity.name && nameToEntity[ref]);
+            graph[entity.name] = references;
+        }
+
+        // A map to store the calculated depth for each entity to avoid redundant calculations
+        // and handle memoization in the DFS.
+        const visited = new Map();
+
+        /**
+         * Performs a Depth-First Search (DFS) to calculate the depth of a given entity.
+         * The depth is determined by the maximum depth of its direct dependencies plus one.
+         *
+         * @param {string} entityName - The name of the entity for which to calculate the depth.
+         * @param {Set<string>} [seen=new Set()] - A set to keep track of entities visited
+         * in the current DFS path to detect and prevent infinite loops in cyclic dependencies.
+         * @returns {number} The calculated depth of the entity.
+         */
+        function dfs(entityName, seen = new Set()) {
+            // If the depth for this entity has already been calculated, return the stored value.
+            if (visited.has(entityName)) return visited.get(entityName);
+            // If the entity is already in the current 'seen' set, it means we've detected a cycle.
+            // In this case, we return a base depth (0) to prevent infinite recursion,
+            // effectively breaking the cycle for depth calculation.
+            if (seen.has(entityName)) return 0;
+            // Add the current entity to the 'seen' set to mark it as visited in this path.
+            seen.add(entityName);
+
+            // Get the direct parent dependencies for the current entity.
+            const parents = graph[entityName] || [];
+
+            // Calculate the maximum depth among all parent dependencies.
+            // If there are no parents, the maxDepth is 0.
+            const maxDepth = parents.length > 0
+            ? Math.max(...parents.map(p => dfs(p, new Set(seen))))
+            : 0;
+
+            // The depth of the current entity is one more than the maximum depth of its parents.
+            const depth = maxDepth + 1;
+            // Store the calculated depth in the 'visited' map for future lookups.
+            visited.set(entityName, depth);
+            return depth;
+        }
+
+        // Calculate the depth for all entities by initiating DFS for each.
+        for (const entity of entities) {
+            entity.depth = dfs(entity.name);
+        }
+
+        // If the 'reverse' flag is true, adjust the depths so that modules with no
+        // dependencies (originally lowest depth) now have the highest depth.
+        if (reverse) {
+            // Find the absolute maximum depth calculated across all entities.
+            const maxDepth = Math.max(...entities.map(e => e.depth));
+            // Invert the depth: (max_depth - current_depth) ensures that a small current_depth
+            // results in a large new_depth, and vice-versa.
+            for (const entity of entities) {
+            entity.depth = maxDepth - entity.depth;
+            }
+        }
+
+        return entities;
+    }
+
+    /**
+     * Sorts a list of entities based on their previously calculated `depth` property.
+     *
+     * By default, entities are sorted in ascending order of depth, meaning entities
+     * with fewer dependencies (lower depth) come first. If `reverse` is true, the
+     * sorting order is inverted, placing entities with more dependencies (higher depth)
+     * first, effectively making entities with no dependencies appear last.
+     *
+     * @param {Array<Object>} entities - A list of entity objects. Each entity object
+     * must already have a `depth` property (number), typically added by `calculateEntityDepth`.
+     * @param {boolean} [reverse=false] - If true, the sorting order is reversed.
+     * Entities with higher original depths will appear earlier in the sorted list.
+     * @returns {Array<Object>} - A *new* array containing the entities sorted
+     * according to their depth. The original `entities` array is not modified.
+     */
+    sortEntitiesByDepth(entities, reverse = false) {
+        // If `reverse` is true, we adjust the `depth` values temporarily for sorting.
+        // This effectively inverts the sorting order so that entities with the highest
+        // original depth will have the lowest adjusted depth, thus coming first.
+        if (reverse) {
+            // Find the maximum depth among all entities to use as a baseline for inversion.
+            const maxDepth = Math.max(...entities.map(e => e.depth));
+            // Iterate through entities and re-map their `depth` for reverse sorting.
+            // A smaller original depth results in a larger new depth, and vice-versa.
+            for (const entity of entities) {
+            entity.depth = maxDepth - entity.depth;
+            }
+        }
+
+        // Return a new sorted array. Using `[...entities]` creates a shallow copy
+        // to avoid modifying the original array, and then sorts it based on the `depth` property.
+        return [...entities].sort((a, b) => a.depth - b.depth);
     }
 }
