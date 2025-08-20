@@ -387,6 +387,58 @@ public class ${upperCamelEntityName}Controller {
     });
     return file;
 }
+    
+    /**
+     * Returns the fully qualified constant name for a given data type string.
+     * This method maps a string value (e.g., "Long") to its corresponding
+     * constant field in the {@link SpecificationUtil} class.
+     *
+     * @param value The string representation of the data type.
+     * @return The fully qualified constant name (e.g., "SpecificationUtil.DATA_TYPE_LONG").
+     */
+    getDataTypeConstant(value) {
+        switch(value) {
+            case "Long":
+                return "SpecificationUtil.DATA_TYPE_LONG";
+            case "Integer":
+                return "SpecificationUtil.DATA_TYPE_INTEGER";
+            case "Double":
+                return "SpecificationUtil.DATA_TYPE_DOUBLE";
+            case "Float":
+                return "SpecificationUtil.DATA_TYPE_FLOAT";
+            case "Boolean":
+                return "SpecificationUtil.DATA_TYPE_BOOLEAN";
+            case "Date":
+                return "SpecificationUtil.DATA_TYPE_DATE";
+            case "DateTime":
+                return "SpecificationUtil.DATA_TYPE_DATETIME";
+            case "String":
+                return "SpecificationUtil.DATA_TYPE_STRING";
+            default:
+                // Return an empty string or throw an exception for unknown types.
+                return "";
+        }
+    }
+
+    /**
+     * Returns the fully qualified constant name for a given filter operation string.
+     * This method maps a string value (e.g., "partial") to its corresponding
+     * constant field in the {@link SpecificationUtil} class.
+     *
+     * @param value The string representation of the filter operation.
+     * @return The fully qualified constant name (e.g., "SpecificationUtil.FILTER_OPERATION_PARTIAL").
+     */
+    getFilterOperationConstant(value) {
+        // Using a switch statement is often more readable and maintainable.
+        switch (value) {
+            case "partial":
+                return "SpecificationUtil.FILTER_OPERATION_PARTIAL";
+            case "exact":
+            default:
+                // Default to "exact" if the value is not "partial"
+                return "SpecificationUtil.FILTER_OPERATION_EXACT";
+        }
+    }
 
 
     /**
@@ -406,10 +458,11 @@ public class ${upperCamelEntityName}Controller {
             let initFilter = '';
             
             entity.columns.forEach(column => {
-                let dataType = _this.getDataType(column.type);
-                let filterType = _this.getFilterType(dataType);
+                let dt = _this.getDataType(column.type);
+                let dataType = _this.getDataTypeConstant(dt);
+                let filterOperation = _this.getFilterOperationConstant(_this.getFilterType(dt));
                 let columnName = stringUtil.camelize(column.name);
-                initFilter += `\t\tthis.queryPredicateMapping.add("${columnName}", "${columnName}", "${dataType}", "${filterType}");\r\n`
+                initFilter += `\t\tthis.queryPredicateMapping.add("${columnName}", "${columnName}", ${dataType}, ${filterOperation});\r\n`
             });
 
             let setIdNull = '';
@@ -441,7 +494,9 @@ public class ${upperCamelEntityName}Controller {
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 
@@ -500,9 +555,14 @@ ${initFilter}
      *         that match the given filtering and sorting criteria.
      */
     public ${upperCamelEntityName}Connection get${upperCamelEntityName}s(Integer pageNumber, Integer pageSize, List<DataFilter> dataFilter, List<DataOrder> dataOrder) {
+        
+        Specification<${upperCamelEntityName}> specification = SpecificationUtil.createSpecificationFromFilter(dataFilter, this.queryPredicateMapping.getFilter());
+        
+        Pageable pageable = PageUtil.pageRequest(pageNumber, pageSize, dataOrder, this.queryPredicateMapping.getFilter(), Sort.by(Sort.Direction.ASC, ${callParamNames}));
+        
         Page<${upperCamelEntityName}> page = ${entityNameCamel}Repository.findAll(
-        		SpecificationUtil.createSpecificationFromFilter(dataFilter, this.queryPredicateMapping.getFilter()), 
-        		PageUtil.pageRequest(pageNumber, pageSize, dataOrder, this.queryPredicateMapping.getFilter(), Sort.by(Sort.Direction.ASC, ${callParamNames}))
+        	specification, 
+        	pageable
         );
         return new ${upperCamelEntityName}Connection(page);
     }
@@ -616,6 +676,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.text.ParseException;
 
 import org.springframework.data.jpa.domain.Specification;
 import org.slf4j.Logger;
@@ -627,10 +689,21 @@ import org.slf4j.LoggerFactory;
  */
 public class SpecificationUtil {
 
-    private SpecificationUtil()
-    {
+    private SpecificationUtil() {
         // Hide public constructor
     }
+
+    public static final String DATA_TYPE_LONG = "Long";
+    public static final String DATA_TYPE_INTEGER = "Integer";
+    public static final String DATA_TYPE_DOUBLE = "Double";
+    public static final String DATA_TYPE_FLOAT = "Float";
+    public static final String DATA_TYPE_BOOLEAN = "Boolean";
+    public static final String DATA_TYPE_DATE = "Date";
+    public static final String DATA_TYPE_DATETIME = "DateTime";
+    public static final String DATA_TYPE_STRING = "String";
+
+    public static final String FILTER_OPERATION_EXACT = "exact";
+    public static final String FILTER_OPERATION_PARTIAL = "partial";
 
     private static final Logger logger = LoggerFactory.getLogger(SpecificationUtil.class);
     private static final String DATE_FORMAT = "yyyy-MM-dd";
@@ -638,72 +711,76 @@ public class SpecificationUtil {
 
     /**
      * Creates a generic {@link Specification} from a list of {@link DataFilter} to build dynamic queries.
-     * This method supports various filtering types based on the provided filterType map.
+     * This method supports various filtering types based on the provided filterOperation map.
      *
      * @param dataFilter list of filters to apply.
-     * @param filterType a map defining the data type and filter type for each field.
+     * @param filters a map defining the data type and filter type for each field.
      * @param <T> The entity type to be filtered.
      * @return a Specification object representing the combined filters.
      */
-    public static <T> Specification<T> createSpecificationFromFilter(List<DataFilter> dataFilter, Map<String, Map<String, String>> filterType) {
-        if (dataFilter == null || dataFilter.isEmpty() || filterType == null) {
+    public static <T> Specification<T> createSpecificationFromFilter(List<DataFilter> dataFilter, Map<String, Map<String, String>> filters) {
+        if (dataFilter == null || dataFilter.isEmpty() || filters == null) {
             return null;
         }
 
-        Specification<T> spec = Specification.where(null);
+        Optional<Specification<T>> spec = Optional.empty();
 
         for (DataFilter filter : dataFilter) {
             String key = filter.getFieldName();
             String fieldValue = filter.getFieldValue();
 
             if (key != null && fieldValue != null) {
-                Map<String, String> fieldInfo = filterType.get(key);
+                Map<String, String> fieldInfo = filters.get(key);
 
                 if (fieldInfo != null) {
                     String fieldName = fieldInfo.get("fieldName");
                     String dataType = fieldInfo.get("dataType");
-                    String filterOperation = fieldInfo.get("filterType");
+                    String filterOperation = fieldInfo.get("filterOperation");
 
-                    spec = spec.and((root, query, criteriaBuilder) -> {
+                    Specification<T> currentSpec = (root, query, criteriaBuilder) -> {
                         try {
                             Path<?> path = resolvePath(root, fieldName);
                             
                             switch (dataType) {
-                                case "Long":
+                                case DATA_TYPE_LONG:
                                     return criteriaBuilder.equal(path, Long.parseLong(fieldValue));
-                                case "Integer":
+                                case DATA_TYPE_INTEGER:
                                     return criteriaBuilder.equal(path, Integer.parseInt(fieldValue));
-                                case "Double":
-                                case "Float":
+                                case DATA_TYPE_DOUBLE:
+                                case DATA_TYPE_FLOAT:
                                     return criteriaBuilder.equal(path, Double.parseDouble(fieldValue));
-                                case "Boolean":
+                                case DATA_TYPE_BOOLEAN:
                                     return criteriaBuilder.equal(path, Boolean.parseBoolean(fieldValue));
-                                case "Date":
+                                case DATA_TYPE_DATE:
                                     Date date = new SimpleDateFormat(DATE_FORMAT).parse(fieldValue);
                                     return criteriaBuilder.equal(path, date);
-                                case "DateTime":
+                                case DATA_TYPE_DATETIME:
                                     Date dateTime = new SimpleDateFormat(DATETIME_FORMAT).parse(fieldValue);
                                     return criteriaBuilder.equal(path, dateTime);
-                                case "String":
-                                    if ("exact".equals(filterOperation)) {
+                                case DATA_TYPE_STRING:
+                                    if (FILTER_OPERATION_EXACT.equals(filterOperation)) {
                                         return criteriaBuilder.equal(path, fieldValue);
-                                    } else if ("partial".equals(filterOperation)) {
+                                    } else if (FILTER_OPERATION_PARTIAL.equals(filterOperation)) {
                                         return criteriaBuilder.like(criteriaBuilder.lower((Path<String>) path), "%" + fieldValue.toLowerCase() + "%");
                                     }
                                     break;
                                 default:
-                                    // Handle unsupported data types
-                                    break;
+                                    logger.warn("Unsupported data type: {}", dataType);
+                                    return null;
                             }
+                        } catch (ParseException e) {
+                            logger.error("Error parsing date/datetime for field {}: {}", fieldName, e.getMessage());
                         } catch (Exception e) {
                             logger.error("Error creating predicate for field {}: {}", fieldName, e.getMessage());
                         }
                         return criteriaBuilder.disjunction(); // Return a false predicate on error
-                    });
+                    };
+
+                    spec = Optional.of(spec.map(s -> s.and(currentSpec)).orElse(currentSpec));
                 }
             }
         }
-        return spec;
+        return spec.orElse(null);
     }
 
     /**
@@ -732,6 +809,7 @@ public class SpecificationUtil {
         return path.get(parts[parts.length - 1]);
     }
 }
+
 `;
         return [{ 
             name: this.createSourceDirectoryFromArtefact(this.packageName) + `utils/SpecificationUtil.java`,
@@ -1364,10 +1442,10 @@ public class QueryPredicateMapping {
 	 * @param key The unique key for the filter (e.g., a field name).
 	 * @param fieldName The actual name of the field in the entity.
 	 * @param dataType The data type of the field (e.g., "String", "Long").
-	 * @param filterType The type of filter operation (e.g., "exact", "partial").
+	 * @param filterOperation The type of filter operation (e.g., "exact", "partial").
 	 */
-	public void add(String key, String fieldName, String dataType, String filterType) {
-		this.filter.put(key, this.createFilterType(fieldName, dataType, filterType));
+	public void add(String key, String fieldName, String dataType, String filterOperation) {
+		this.filter.put(key, this.createFilterType(fieldName, dataType, filterOperation));
 	}
 
 	/**
@@ -1375,15 +1453,15 @@ public class QueryPredicateMapping {
 	 *
 	 * @param fieldName The name of the field.
 	 * @param dataType The data type of the field.
-	 * @param filterType The filter operation type.
+	 * @param filterOperation The filter operation type.
 	 * @return A map containing the filter properties.
 	 */
-	private Map<String, String> createFilterType(String fieldName, String dataType, String filterType) {
+	private Map<String, String> createFilterType(String fieldName, String dataType, String filterOperation) {
 		Map<String, String> field = new HashMap<>();
 		
 		field.put("fieldName", fieldName);
 		field.put("dataType", dataType);
-		field.put("filterType", filterType);
+		field.put("filterOperation", filterOperation);
 		
 		return field;
 	}
