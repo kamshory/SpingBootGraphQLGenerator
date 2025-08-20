@@ -220,39 +220,66 @@ spring.application.version=${this.version}
     {
         const content = `package ${this.packageName}.config;
 
+import java.net.InetAddress;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.graphql.server.WebGraphQlInterceptor;
 import org.springframework.graphql.server.WebGraphQlRequest;
 import org.springframework.graphql.server.WebGraphQlResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
+import org.springframework.util.MultiValueMapAdapter;
+
 import reactor.core.publisher.Mono;
 
+/**
+ * The GraphQLRequestInterceptor is a Spring component that intercepts every GraphQL request.
+ * It is responsible for capturing and storing important request metadata such as the client's
+ * IP address, HTTP headers, and the raw GraphQL query into the GraphQLContext.
+ *
+ * By storing this data in the GraphQLContext, it can be accessed by any DataFetcher or
+ * resolver during query execution. This enables functionalities like logging, auditing,
+ * or context-based validation.
+ */
 @Component
 public class GraphQLRequestInterceptor implements WebGraphQlInterceptor {
-
+    /**
+     * Intercepts an incoming GraphQL request and adds metadata to its GraphQLContext.
+     *
+     * @param request The incoming GraphQL request.
+     * @param chain   The interceptor chain used to pass the request along.
+     * @return A Mono<WebGraphQlResponse> representing the response after execution.
+     */
     @Override
     public Mono<WebGraphQlResponse> intercept(WebGraphQlRequest request, Chain chain) {
-        // Get all headers
         Map<String, String> headers = request.getHeaders().toSingleValueMap();
+        String clientIp = Optional.ofNullable(request.getRemoteAddress())
+                .map(addr -> addr.getAddress())
+                .map(InetAddress::getHostAddress)
+                .orElse("UNKNOWN");
+        String path = request.getUri().getPath();
+        MultiValueMap<String, String> queryParams = request.getUri().getQueryParams();
+        
+        Map<String, String> queryParamsFlat = Optional.ofNullable(queryParams).orElse(new MultiValueMapAdapter<>(new HashMap<>())).toSingleValueMap();
+        
+        String graphqlQuery = Optional.ofNullable(request.getDocument()).orElse("");
 
-        // Get IP address
-        String clientIp = request.getRemoteAddress() != null
-                ? request.getRemoteAddress().getAddress().getHostAddress()
-                : "UNKNOWN";
+        Map<String, Object> contextMap = new HashMap<>();
+        contextMap.put("clientIp", clientIp);
+        contextMap.put("headers", headers);
+        contextMap.put("path", path);
+        contextMap.put("queryParams", queryParamsFlat);
+        contextMap.put("graphqlQuery", graphqlQuery);
 
-        // Put it into GraphQLContext
         request.configureExecutionInput((executionInput, builder) ->
-                builder.graphQLContext(Map.of(
-                        "clientIp", clientIp,
-                        "headers", headers
-                )).build()
+                builder.graphQLContext(contextMap).build()
         );
 
         return chain.next(request);
     }
 }
-
 `;
         return [{ name: this.createSourceDirectoryFromArtefact(this.packageName) + 'config/GraphQLRequestInterceptor.java', content: content }]; 
     }
@@ -307,18 +334,17 @@ import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.stereotype.Controller;
 
-
 import ${this.packageName}.output.${upperCamelEntityName}Connection;
 import ${this.packageName}.utils.DataFilter;
 import ${this.packageName}.utils.DataOrder;
+import ${this.packageName}.dto.${upperCamelEntityName}Create;
+import ${this.packageName}.dto.${upperCamelEntityName}Update;
 import ${this.packageName}.entity.${upperCamelEntityName};
-import ${this.packageName}.entity.${upperCamelEntityName}Input;
 import ${this.packageName}.service.${upperCamelEntityName}Service;
 
 import graphql.schema.DataFetchingEnvironment;
 
 import lombok.RequiredArgsConstructor;
-
 
 @Controller
 @RequiredArgsConstructor
@@ -337,12 +363,12 @@ public class ${upperCamelEntityName}Controller {
     }
 
     @MutationMapping
-    public ${upperCamelEntityName} create${upperCamelEntityName}(@Argument ${upperCamelEntityName}Input input, DataFetchingEnvironment env) {
+    public ${upperCamelEntityName} create${upperCamelEntityName}(@Argument ${upperCamelEntityName}Create input, DataFetchingEnvironment env) {
         return ${entityNameCamel}Service.create${upperCamelEntityName}(input);
     }
 
     @MutationMapping
-    public ${upperCamelEntityName} update${upperCamelEntityName}(@Argument ${upperCamelEntityName}Input input, DataFetchingEnvironment env) {
+    public ${upperCamelEntityName} update${upperCamelEntityName}(@Argument ${upperCamelEntityName}Update input, DataFetchingEnvironment env) {
         return ${entityNameCamel}Service.update${upperCamelEntityName}(input);
     }
 
@@ -383,7 +409,7 @@ public class ${upperCamelEntityName}Controller {
                 let dataType = _this.getDataType(column.type);
                 let filterType = _this.getFilterType(dataType);
                 let columnName = stringUtil.camelize(column.name);
-                initFilter += `\t\tthis.fetchProperties.add("${columnName}", "${columnName}", "${dataType}", "${filterType}");\r\n`
+                initFilter += `\t\tthis.queryPredicateMapping.add("${columnName}", "${columnName}", "${dataType}", "${filterType}");\r\n`
             });
 
             let setIdNull = '';
@@ -415,9 +441,12 @@ public class ${upperCamelEntityName}Controller {
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 
+import ${this.packageName}.dto.${upperCamelEntityName}Create;
+import ${this.packageName}.dto.${upperCamelEntityName}Update;
 import ${this.packageName}.entity.${upperCamelEntityName};
 import ${this.packageName}.entity.${upperCamelEntityName}Input;
 import ${this.packageName}.output.${upperCamelEntityName}Connection;
@@ -425,11 +454,9 @@ import ${this.packageName}.repository.${upperCamelEntityName}Repository;
 import ${this.packageName}.repository.${upperCamelEntityName}InputRepository;
 import ${this.packageName}.utils.DataFilter;
 import ${this.packageName}.utils.DataOrder;
-import ${this.packageName}.utils.FetchProperties;
+import ${this.packageName}.utils.QueryPredicateMapping;
 import ${this.packageName}.utils.PageUtil;
 import ${this.packageName}.utils.SpecificationUtil;
-
-
 
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
@@ -450,12 +477,12 @@ public class ${upperCamelEntityName}Service {
     private final ${upperCamelEntityName}Repository ${entityNameCamel}Repository;
     private final ${upperCamelEntityName}InputRepository ${entityNameCamel}InputRepository;
 
-    private FetchProperties fetchProperties;
+    private QueryPredicateMapping queryPredicateMapping;
     
     @PostConstruct
     public void init()
     {
-    	fetchProperties = new FetchProperties();
+    	queryPredicateMapping = new QueryPredicateMapping();
     	
 ${initFilter}
     }
@@ -473,10 +500,9 @@ ${initFilter}
      *         that match the given filtering and sorting criteria.
      */
     public ${upperCamelEntityName}Connection get${upperCamelEntityName}s(Integer pageNumber, Integer pageSize, List<DataFilter> dataFilter, List<DataOrder> dataOrder) {
-    	List<DataOrder> filteredDataOrder = this.fetchProperties.filterFieldName(dataOrder);
         Page<${upperCamelEntityName}> page = ${entityNameCamel}Repository.findAll(
-        		SpecificationUtil.createSpecificationFromFilter(dataFilter, this.fetchProperties.getFilter()), 
-        		PageUtil.pageRequest(pageNumber, pageSize, filteredDataOrder, ${callParamNames})
+        		SpecificationUtil.createSpecificationFromFilter(dataFilter, this.queryPredicateMapping.getFilter()), 
+        		PageUtil.pageRequest(pageNumber, pageSize, dataOrder, this.queryPredicateMapping.getFilter(), Sort.by(Sort.Direction.ASC, ${callParamNames}))
         );
         return new ${upperCamelEntityName}Connection(page);
     }
@@ -497,8 +523,8 @@ ${initFilter}
      * @param input the ${upperCamelEntityName} entity to be created.
      * @return the saved ${upperCamelEntityName} entity.
      */
-    public ${upperCamelEntityName} create${upperCamelEntityName}(${upperCamelEntityName}Input input) {${setIdNull}
-        ${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(input);
+    public ${upperCamelEntityName} create${upperCamelEntityName}(${upperCamelEntityName}Create input) {
+        ${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(${upperCamelEntityName}Create.createEntity(input));
         return ${entityNameCamel}Repository.findOneBy${methodNameSuffix}(
             ${primaryKeys.map(pk => `saved.get${stringUtil.upperCamel(stringUtil.camelize(pk.name))}()`).join(', ')}
         );
@@ -510,8 +536,8 @@ ${initFilter}
      * @param input the ${upperCamelEntityName} entity containing updated values.
      * @return the updated ${upperCamelEntityName} entity.
      */
-    public ${upperCamelEntityName} update${upperCamelEntityName}(${upperCamelEntityName}Input input) {
-        ${updateValidation}${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(input);
+    public ${upperCamelEntityName} update${upperCamelEntityName}(${upperCamelEntityName}Update input) {
+        ${updateValidation}${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(${upperCamelEntityName}Update.createEntity(input));
         return ${entityNameCamel}Repository.findOneBy${methodNameSuffix}(
             ${primaryKeys.map(pk => `saved.get${stringUtil.upperCamel(stringUtil.camelize(pk.name))}()`).join(', ')}
         );
@@ -582,15 +608,16 @@ public class PageUtil {
     {
         const content = `package ${this.packageName}.utils;
 
-import java.text.ParseException;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Root;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import org.springframework.data.jpa.domain.Specification;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -599,6 +626,11 @@ import org.slf4j.LoggerFactory;
  * This class provides a generic method that can be used for any entity type.
  */
 public class SpecificationUtil {
+
+    private SpecificationUtil()
+    {
+        // Hide public constructor
+    }
 
     private static final Logger logger = LoggerFactory.getLogger(SpecificationUtil.class);
     private static final String DATE_FORMAT = "yyyy-MM-dd";
@@ -621,81 +653,83 @@ public class SpecificationUtil {
         Specification<T> spec = Specification.where(null);
 
         for (DataFilter filter : dataFilter) {
-            String fieldName = filter.getFieldName();
+            String key = filter.getFieldName();
             String fieldValue = filter.getFieldValue();
 
-            if (fieldName != null && fieldValue != null) {
-                Map<String, String> fieldInfo = filterType.get(fieldName);
+            if (key != null && fieldValue != null) {
+                Map<String, String> fieldInfo = filterType.get(key);
 
                 if (fieldInfo != null) {
+                    String fieldName = fieldInfo.get("fieldName");
                     String dataType = fieldInfo.get("dataType");
                     String filterOperation = fieldInfo.get("filterType");
 
-                    if (Objects.equals(filterOperation, "exact")) {
-                        switch (dataType) {
-                            case "Long":
-                                spec = spec.and((root, query, criteriaBuilder) ->
-                                    criteriaBuilder.equal(root.get(fieldName), Long.parseLong(fieldValue))
-                                );
-                                break;
-                            case "Integer":
-                                spec = spec.and((root, query, criteriaBuilder) ->
-                                    criteriaBuilder.equal(root.get(fieldName), Integer.parseInt(fieldValue))
-                                );
-                                break;
-                            case "Double":
-                            case "Float":
-                                spec = spec.and((root, query, criteriaBuilder) ->
-                                    criteriaBuilder.equal(root.get(fieldName), Double.parseDouble(fieldValue))
-                                );
-                                break;
-                            case "Boolean":
-                                spec = spec.and((root, query, criteriaBuilder) ->
-                                    criteriaBuilder.equal(root.get(fieldName), Boolean.parseBoolean(fieldValue))
-                                );
-                                break;
-                            case "Date":
-                                spec = spec.and((root, query, criteriaBuilder) -> {
-                                    try {
-                                        Date date = new SimpleDateFormat(DATE_FORMAT).parse(fieldValue);
-                                        return criteriaBuilder.equal(root.<Date>get(fieldName), date);
-                                    } catch (ParseException e) {
-                                        logger.error("Error parsing date for field {}: {}", fieldName, e.getMessage());
-                                        return criteriaBuilder.disjunction(); // Return a false predicate
+                    spec = spec.and((root, query, criteriaBuilder) -> {
+                        try {
+                            Path<?> path = resolvePath(root, fieldName);
+                            
+                            switch (dataType) {
+                                case "Long":
+                                    return criteriaBuilder.equal(path, Long.parseLong(fieldValue));
+                                case "Integer":
+                                    return criteriaBuilder.equal(path, Integer.parseInt(fieldValue));
+                                case "Double":
+                                case "Float":
+                                    return criteriaBuilder.equal(path, Double.parseDouble(fieldValue));
+                                case "Boolean":
+                                    return criteriaBuilder.equal(path, Boolean.parseBoolean(fieldValue));
+                                case "Date":
+                                    Date date = new SimpleDateFormat(DATE_FORMAT).parse(fieldValue);
+                                    return criteriaBuilder.equal(path, date);
+                                case "DateTime":
+                                    Date dateTime = new SimpleDateFormat(DATETIME_FORMAT).parse(fieldValue);
+                                    return criteriaBuilder.equal(path, dateTime);
+                                case "String":
+                                    if ("exact".equals(filterOperation)) {
+                                        return criteriaBuilder.equal(path, fieldValue);
+                                    } else if ("partial".equals(filterOperation)) {
+                                        return criteriaBuilder.like(criteriaBuilder.lower((Path<String>) path), "%" + fieldValue.toLowerCase() + "%");
                                     }
-                                });
-                                break;
-                            case "DateTime":
-                                spec = spec.and((root, query, criteriaBuilder) -> {
-                                    try {
-                                        Date dateTime = new SimpleDateFormat(DATETIME_FORMAT).parse(fieldValue);
-                                        return criteriaBuilder.equal(root.<Date>get(fieldName), dateTime);
-                                    } catch (ParseException e) {
-                                        logger.error("Error parsing datetime for field {}: {}", fieldName, e.getMessage());
-                                        return criteriaBuilder.disjunction(); // Return a false predicate
-                                    }
-                                });
-                                break;
-                            case "String":
-                                spec = spec.and((root, query, criteriaBuilder) ->
-                                    criteriaBuilder.equal(root.get(fieldName), fieldValue)
-                                );
-                                break;
-                            default:
-                                // Handle unsupported data types, e.g., log a warning
-                                break;
+                                    break;
+                                default:
+                                    // Handle unsupported data types
+                                    break;
+                            }
+                        } catch (Exception e) {
+                            logger.error("Error creating predicate for field {}: {}", fieldName, e.getMessage());
                         }
-                    } else if (Objects.equals(filterOperation, "partial")) {
-                        if (Objects.equals(dataType, "String")) {
-                            spec = spec.and((root, query, criteriaBuilder) ->
-                                criteriaBuilder.like(criteriaBuilder.lower(root.get(fieldName)), "%" + fieldValue.toLowerCase() + "%")
-                            );
-                        }
-                    }
+                        return criteriaBuilder.disjunction(); // Return a false predicate on error
+                    });
                 }
             }
         }
         return spec;
+    }
+
+    /**
+     * Helper method to resolve a nested path by performing joins.
+     * This method handles both direct attributes and nested attributes with multiple dots.
+     *
+     * @param root The root of the query.
+     * @param fieldName The dot-separated field name (e.g., "album.artist.name").
+     * @return The final Path object to the attribute.
+     */
+    private static Path<?> resolvePath(Root<?> root, String fieldName) {
+        String[] parts = fieldName.split("\\\\.");
+        Path<?> path = root;
+
+        // Iterate through all parts of the path
+        for (int i = 0; i < parts.length - 1; i++) {
+            // Cast to Join is needed to continue the path, but only if the current path is not the root
+            if (path instanceof Root) {
+                 path = ((Root<?>) path).join(parts[i]);
+            } else {
+                 path = ((Join<?, ?>) path).join(parts[i]);
+            }
+        }
+        
+        // Return the final Path to the attribute
+        return path.get(parts[parts.length - 1]);
     }
 }
 `;
@@ -1151,12 +1185,144 @@ import lombok.Getter;
         entityInputContent += `}
 `;
 
+        file.push({
+            name: this.createSourceDirectoryFromArtefact(this.packageName) + `entity/${upperCamelEntityName}Input.java`,
+            content: entityInputContent
+        });
+
+
+
+
+        // === 3. DTO for
+        let entityCreateContent = `package ${this.packageName}.dto;
+
+import java.util.Date;
+import java.util.UUID;
+import java.math.BigDecimal;
+
+import lombok.Setter;
+import lombok.Getter;
+
+import org.springframework.beans.BeanUtils;
+
+import ${this.packageName}.entity.${upperCamelEntityName}Input;
+
+/**
+ * Data Transfer Object (DTO) for creating a new ${upperCamelEntityName} entity.
+ *
+ * <p>This class is automatically generated by GraphQL Generator.</p>
+ *
+ * <p>It represents the input fields required by the CREATE mutation of the
+ * {@code ${entityNameSnake}} table. The DTO can be converted into an {@link ${upperCamelEntityName}Input}
+ * entity using the {@link #createEntity(${upperCamelEntityName}Create)} factory method.</p>
+ */
+@Setter
+@Getter
+`;
+        entityCreateContent += `public class ${upperCamelEntityName}Create {
+
+`;
+
+        entity.columns.forEach(column => {
+            let columnName = column.name;
+            let columnCamelName = stringUtil.camelize(columnName);
+            let columnType = column.type;
+            let columnJavaType = this.getJavaType(columnType);
+
+            if (!column.autoIncrement) {
+                entityCreateContent += `    private ${columnJavaType} ${columnCamelName};
+`;
+            }
+        });
+
+        entityCreateContent += `\r\n    /**
+     * Converts this DTO into a new {@link ${upperCamelEntityName}Input} entity.
+     *
+     * @param dto the {@code ${upperCamelEntityName}Create} DTO to convert
+     * @return a new {@code ${upperCamelEntityName}Input} entity populated with values from the DTO
+     */
+    public static ${upperCamelEntityName}Input createEntity(${upperCamelEntityName}Create dto) {
+        ${upperCamelEntityName}Input entity = new ${upperCamelEntityName}Input();
+        BeanUtils.copyProperties(dto, entity);
+        return entity;
+    }
+`;
+
+        entityCreateContent += `}
+`;
+
             file.push({
-                name: this.createSourceDirectoryFromArtefact(this.packageName) + `entity/${upperCamelEntityName}Input.java`,
-                content: entityInputContent
+                name: this.createSourceDirectoryFromArtefact(this.packageName) + `dto/${upperCamelEntityName}Create.java`,
+                content: entityCreateContent
             });
 
+
+        let entityUpdateContent = `package ${this.packageName}.dto;
+
+import java.util.Date;
+import java.util.UUID;
+import java.math.BigDecimal;
+
+import lombok.Setter;
+import lombok.Getter;
+
+import org.springframework.beans.BeanUtils;
+
+import ${this.packageName}.entity.${upperCamelEntityName}Input;
+
+/**
+ * Data Transfer Object (DTO) for updating an existing ${upperCamelEntityName} entity.
+ *
+ * <p>This class is automatically generated by GraphQL Generator.</p>
+ *
+ * <p>It represents the input fields required by the UPDATE mutation of the
+ * {@code ${entityNameSnake}} table. The DTO can be converted into an {@link ${upperCamelEntityName}Input}
+ * entity using the {@link #createEntity(${upperCamelEntityName}Create)} factory method.</p>
+ */
+@Setter
+@Getter
+`;
+        entityUpdateContent += `public class ${upperCamelEntityName}Update {
+
+`;
+
+        entity.columns.forEach(column => {
+            let columnName = column.name;
+            let columnCamelName = stringUtil.camelize(columnName);
+            let columnType = column.type;
+            let columnJavaType = this.getJavaType(columnType);
+
+            entityUpdateContent += `    private ${columnJavaType} ${columnCamelName};
+`;
         });
+
+
+        entityUpdateContent += `\r\n    /**
+     * Converts this DTO into a new {@link ${upperCamelEntityName}Input} entity.
+     *
+     * @param dto the {@code ${upperCamelEntityName}Update} DTO to convert
+     * @return a new {@code ${upperCamelEntityName}Input} entity populated with values from the DTO
+     */
+    public static ${upperCamelEntityName}Input createEntity(${upperCamelEntityName}Update dto) {
+        ${upperCamelEntityName}Input entity = new ${upperCamelEntityName}Input();
+        BeanUtils.copyProperties(dto, entity);
+        return entity;
+    }
+`;
+        entityUpdateContent += `}
+`;
+            file.push({
+                name: this.createSourceDirectoryFromArtefact(this.packageName) + `dto/${upperCamelEntityName}Update.java`,
+                content: entityUpdateContent
+            });
+
+
+
+            
+
+
+        });
+
 
         return file;
     }
@@ -1181,12 +1347,12 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-public class FetchProperties {
+public class QueryPredicateMapping {
 	
 	private Map<String, Map<String, String>> filter;
 	private List<Map<String, String>> order;
 	
-	public FetchProperties()
+	public QueryPredicateMapping()
 	{
 		this.filter = new HashMap<>();
 		this.order = new ArrayList<>();
@@ -1266,7 +1432,7 @@ public class FetchProperties {
 }
 `;
         return [{ 
-            name: this.createSourceDirectoryFromArtefact(this.packageName) + `utils/FetchProperties.java`,
+            name: this.createSourceDirectoryFromArtefact(this.packageName) + `utils/QueryPredicateMapping.java`,
             content: content 
         }];
     }
@@ -1281,77 +1447,85 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.domain.Sort.Order;
 import java.util.List;
+import java.util.Map;
 import java.util.ArrayList;
-import java.util.Objects;
 
 public class PageUtil {
+    
+    private PageUtil()
+    {
+        // Hide public constructor
+    }
 
     /**
      * Creates a Pageable object for paginated and sorted queries.
      *
      * @param pageNumber The 1-based page number. Defaults to 1 if null or less than 1.
      * @param pageSize The number of items per page. Defaults to 20, min is 1.
-     * @param sortFields A list of maps, with each map containing "fieldName" and "sortType".
-     * @param orderByFields An array of field names to sort by. Defaults to ascending.
+     * @param sortFields A list of DataOrder objects to sort by.
+     * @param map A map to resolve the actual field names from the given keys.
+     * @param defaultSortOrder An array of Sort objects to use as the default sort order.
      * @return A Pageable object configured with pagination and sorting.
      */
-    public static Pageable pageRequest(Integer pageNumber, Integer pageSize, List<DataOrder> sortFields, String... orderByFields) {
+    public static Pageable pageRequest(Integer pageNumber, Integer pageSize, List<DataOrder> sortFields, Map<String, Map<String, String>> map, Sort... defaultSortOrder) {
         // Handle page number: convert to 0-based and ensure it's not negative.
         int currentPage = (pageNumber != null && pageNumber > 0) ? pageNumber - 1 : 0;
         
         // Handle page size: ensure it's at least 1.
         int rowPerPage = (pageSize != null && pageSize > 0) ? pageSize : 20;
         
-        Sort sort = createSortFromList(sortFields);
+        Sort sort = createSortFromList(sortFields, map);
 
-        if (sort.isUnsorted() && orderByFields != null && orderByFields.length > 0) {
-            sort = Sort.by(Direction.ASC, orderByFields);
+        if (sort.isUnsorted() && defaultSortOrder != null && defaultSortOrder.length > 0) {
+            // Correct way to combine multiple Sort objects
+            Sort defaultSort = defaultSortOrder[0];
+            for (int i = 1; i < defaultSortOrder.length; i++) {
+                defaultSort = defaultSort.and(defaultSortOrder[i]);
+            }
+            sort = defaultSort;
         }
         
         return PageRequest.of(currentPage, rowPerPage, sort);
     }
     
     /**
-     * Creates a {@link Sort} object from a list of maps, where each map
-     * specifies a field to sort by and the sort direction.
+     * Creates a {@link Sort} object from a list of {@link DataOrder} objects.
      *
-     * @param sortFields A list of maps, with each map containing "fieldName" and "sortType" (e.g., "asc" or "desc").
+     * @param sortFields A list of DataOrder objects, with each object containing "fieldName" and "sortType".
+     * @param map A map to resolve the actual field names from the given keys.
      * @return a Sort object representing the combined sorting criteria.
      */
-    public static Sort createSortFromList(List<DataOrder> sortFields) {
+    public static Sort createSortFromList(List<DataOrder> sortFields, Map<String, Map<String, String>> map) {
         if (sortFields == null || sortFields.isEmpty()) {
-            // Return unsorted object if no fields are provided
             return Sort.unsorted();
         }
 
         List<Order> orders = new ArrayList<>();
         for (DataOrder field : sortFields) {
-            String fieldName = field.getFieldName();
-            String orderTypeType = field.getOrderType();
-            if(orderTypeType == null)
-            {
-            	orderTypeType = "asc";
+            String key = field.getFieldName();
+            String orderType = field.getOrderType();
+            
+            // Default to "asc" if no order type is provided
+            if (orderType == null) {
+                orderType = "asc";
             }
 
-            if (fieldName != null && orderTypeType != null) {
-                // Default direction is ASC
-                Direction direction = Direction.ASC;
-                if (Objects.equals(orderTypeType.toLowerCase(), "desc")) {
-                    direction = Direction.DESC;
+            if (key != null) {
+                Map<String, String> orderInfo = map.get(key);
+                if (orderInfo != null) {
+                    String fieldName = orderInfo.get("fieldName");
+                    Direction direction = "desc".equalsIgnoreCase(orderType) ? Direction.DESC : Direction.ASC;
+                    orders.add(new Order(direction, fieldName));
                 }
-                orders.add(new Order(direction, fieldName));
             }
         }
         
-        // If the list of orders is empty after processing, return unsorted
         if (orders.isEmpty()) {
             return Sort.unsorted();
         }
 
         return Sort.by(orders);
     }
-
-
 }
 `;
         return [{ 
