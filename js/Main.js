@@ -2,6 +2,9 @@ let stringUtil = new StringUtil();
 let generator = new GraphQLSpringGenerator();
 let sqlParser = new SQLParser();
 let util = new GraphQLSchemaUtils();
+let entityRenderer;
+let updatedWidth = 600;
+let drawRelationship = true;
 
 /**
  * Autopopulates the JDBC driver class name and Hibernate dialect
@@ -114,12 +117,33 @@ function applyModel(model) {
     generator.setModel(model);
 }
 
+let resizeTimeout;
 
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        const wrapper = document.querySelector('.erd-wrapper');
+        if (wrapper) {
+            const width = wrapper.clientWidth;
+            entityRenderer.createERD(
+                generator.getModel(),
+                width, 
+                drawRelationship
+            );
+        }
+    }, 300); 
+});
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('configForm');
     const packageNameInput = document.getElementById("packageName");
     const dbUrlInput = document.getElementById("dbUrl");
     const sqlFileInput = document.getElementById('sqlFile');
+    
+    entityRenderer = new EntityRenderer(".erd-svg");
+    const wrapper = document.querySelector('.erd-wrapper');
+    if (wrapper) {
+        updatedWidth = wrapper.clientWidth;
+    }
 
     packageNameInput.addEventListener('change', function (e) {
         autopopulatePackage(e.target.value);
@@ -141,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sqlFile) {
             sqlParser.importSQLFile(sqlFile, (model) => {
                 applyModel(model);
+                entityRenderer.createERD(model, updatedWidth, drawRelationship);
             });
         }
     });
@@ -150,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sqlFileInit) {
         sqlParser.importSQLFile(sqlFileInit, (model) => {
             applyModel(model);
+            entityRenderer.createERD(model, updatedWidth, drawRelationship);
         });
     }
 

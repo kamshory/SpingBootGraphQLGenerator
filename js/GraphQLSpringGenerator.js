@@ -1848,6 +1848,19 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
         <artifactId>mysql-connector-j</artifactId>
         <scope>runtime</scope>
     </dependency>
+
+    <dependency>
+        <groupId>org.mariadb.jdbc</groupId>
+        <artifactId>mariadb-java-client</artifactId>
+        <version>3.5.1</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>42.7.4</version>
+    </dependency>
+    
     <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
