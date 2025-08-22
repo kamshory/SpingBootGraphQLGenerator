@@ -15,13 +15,64 @@ class GraphQLSpringGenerator {
         this.model = null;
     }
 
-    setModel(model)
-    {
+    /**
+     * Moves an entity up in the list by swapping it with the next entity.
+     *
+     * @param {number} index - The index of the entity to move up.
+     * @param {Function} callback - A callback function to execute after the operation.
+     */
+    moveEntityUp(index, callback) {
+        if (index < this.model.entities.length - 1) {
+            const temp = this.model.entities[index];
+            this.model.entities[index] = this.model.entities[index + 1];
+            this.model.entities[index + 1] = temp;
+            this.updateEntityIndex();
+        }
+        callback();
+    }
+
+    /**
+     * Moves an entity down in the list by swapping it with the previous entity.
+     *
+     * @param {number} index - The index of the entity to move down.
+     * @param {Function} callback - A callback function to execute after the operation.
+     */
+    moveEntityDown(index, callback) {
+        if (index > 0) {
+            const temp = this.model.entities[index];
+            this.model.entities[index] = this.model.entities[index - 1];
+            this.model.entities[index - 1] = temp;
+            this.updateEntityIndex();
+        }
+        callback();
+    }
+
+    /**
+     * Updates the `index` property of each entity in the `entities` array
+     * to reflect their current position in the list. This ensures that
+     * entity indices remain consistent after reordering operations.
+     */
+    updateEntityIndex() {
+        this.model.entities.forEach((entity, index) => {
+            entity.index = index;
+        });
+    }
+
+    /**
+     * Sets the model containing the entities.
+     *
+     * @param {Object} model - The model object that contains the `entities` array.
+     */
+    setModel(model) {
         this.model = model;
     }
 
-    getModel()
-    {
+    /**
+     * Returns the current model containing the entities.
+     *
+     * @returns {Object} The model object.
+     */
+    getModel() {
         return this.model;
     }
 

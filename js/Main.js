@@ -124,14 +124,18 @@ window.addEventListener('resize', () => {
     resizeTimeout = setTimeout(() => {
         const wrapper = document.querySelector('.erd-wrapper');
         if (wrapper) {
-            const width = wrapper.clientWidth;
+            let width = wrapper.clientWidth;
+            if(width < 480)
+            {
+                width = 480;
+            }
             entityRenderer.createERD(
                 generator.getModel(),
                 width, 
                 drawRelationship
             );
         }
-    }, 300); 
+    }, 30); 
 });
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('configForm');
@@ -140,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sqlFileInput = document.getElementById('sqlFile');
     
     entityRenderer = new EntityRenderer(".erd-svg");
+    entityRenderer.initIconEvent(generator);
     const wrapper = document.querySelector('.erd-wrapper');
     if (wrapper) {
         updatedWidth = wrapper.clientWidth;
@@ -165,6 +170,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sqlFile) {
             sqlParser.importSQLFile(sqlFile, (model) => {
                 applyModel(model);
+                if(updatedWidth < 480)
+                {
+                    updatedWidth = 480;
+                }
                 entityRenderer.createERD(model, updatedWidth, drawRelationship);
             });
         }
@@ -175,6 +184,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sqlFileInit) {
         sqlParser.importSQLFile(sqlFileInit, (model) => {
             applyModel(model);
+            if(updatedWidth < 480)
+            {
+                updatedWidth = 480;
+            }
             entityRenderer.createERD(model, updatedWidth, drawRelationship);
         });
     }
