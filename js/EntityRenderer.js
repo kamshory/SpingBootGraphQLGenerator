@@ -49,6 +49,38 @@ class EntityRenderer {
         this.buttonFontSize = 10;
         this.tableFontSize = 12;
         this.relationStrokeWidth = 0.7;
+        this.width = 1;
+        this.drawRelationship = false;
+    }
+
+    /**
+     * Initializes click event listeners for icons within the SVG diagram.
+     * 
+     * The event listener detects clicks on specific icon elements and triggers
+     * the corresponding methods on the provided `generator` instance.
+     * 
+     * Icon behavior:
+     * - `.move-down-icon`: Calls `generator.moveEntityUp()` with the clicked entity's index.
+     * - `.move-up-icon`: Calls `generator.moveEntityDown()` with the clicked entity's index.
+     * 
+     * After moving an entity, the ERD diagram is re-rendered by calling `_this.createERD()`.
+     *
+     * @param {GraphQLSpringGenerator} generator - Instance responsible for entity operations.
+     */
+    initIconEvent(generator) {
+        let _this = this;
+        this.svg.addEventListener('click', function(e) {
+            if (e.target.closest('.erd-svg .move-down-icon')) {
+                generator.moveEntityUp(parseInt(e.target.dataset.index), function(){
+                    _this.createERD(_this.data, _this.width, _this.drawRelationship);
+                });
+            }
+            if (e.target.closest('.erd-svg .move-up-icon')) {
+                generator.moveEntityDown(parseInt(e.target.dataset.index), function(){
+                    _this.createERD(_this.data, _this.width, _this.drawRelationship);
+                });
+            }
+        });
     }
 
     /**
@@ -67,6 +99,8 @@ class EntityRenderer {
      *   If `true`, the method will create relationship lines between the tables after placing them.
      */
     createERD(data, width, drawRelationship) {
+        this.drawRelationship = drawRelationship;
+        this.width = width;
         this.svg = document.querySelector(this.selector); // The SVG element to render the ERD
         this.lastMaxCol = 0;
         this.maxCol = 0;
@@ -220,15 +254,13 @@ class EntityRenderer {
         const headerRect = this.createSvgRect(1, 1, this.tableWidth - 2, 24, this.headerBackgroundColor);
         group.appendChild(headerRect);
 
-        const titleGroup = this.createSvgForeignText(10, 5, this.tableWidth - 95, 18, entity.name);
+        const titleGroup = this.createSvgForeignText(10, 5, this.tableWidth - 60, 18, entity.name);
         group.appendChild(titleGroup);
 
+        
         const controlButtons = [
-            { icon: "📄", offset: 5, className: "view-data-icon" },
-            { icon: "⬅️", offset: 4, className: "move-up-icon" },
-            { icon: "➡️", offset: 3, className: "move-down-icon" },
-            { icon: "✏️", offset: 2, className: "edit-icon" },
-            { icon: "❌", offset: 1, className: "delete-icon" }
+            { icon: "⬅️", offset: 2, className: "move-up-icon" },
+            { icon: "➡️", offset: 1, className: "move-down-icon" },
         ];
 
         controlButtons.forEach(({ icon, offset, className }) => {
@@ -252,6 +284,7 @@ class EntityRenderer {
             iconRect.style.cursor = "pointer";
             group.appendChild(iconRect);
         });
+        
 
         entity.columns.forEach((col, i) => {
             const yPosition = yOffset + (i * this.columnHeight);
