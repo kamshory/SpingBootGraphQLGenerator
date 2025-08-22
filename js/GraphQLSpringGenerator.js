@@ -15,6 +15,16 @@ class GraphQLSpringGenerator {
         this.model = null;
     }
 
+    setModel(model)
+    {
+        this.model = model;
+    }
+
+    getModel()
+    {
+        return this.model;
+    }
+
     /**
      * Generates all virtual files required for the Spring GraphQL project.
      * Includes entity, repository, service, controller, schema, and pom files.
@@ -78,7 +88,10 @@ class GraphQLSpringGenerator {
         this.javaVersion = config.javaVersion || "21";
         this.version = config.version || "1.0.0";
         this.maxRelationDepth = 3; // Default max depth for nested relations
-        this.model = model;
+        if(model)
+        {
+            this.model = model;
+        }
 
         const loadingMessage = document.getElementById('loading');
         loadingMessage.style.display = 'block';
@@ -192,7 +205,7 @@ server.port=${appConfig.port || 8080}
 # Database configuration
 spring.datasource.url=${databaseConfig.url || 'jdbc:mysql://localhost:3306/mydb'}
 spring.datasource.username=${databaseConfig.username || 'root'}
-spring.datasource.password=${databaseConfig.password || ''}
+spring.datasource.password=${databaseConfig.password /*NOSONAR*/ || ''}
 spring.datasource.driver-class-name=${databaseConfig.driver || 'com.mysql.cj.jdbc.Driver'}
 # JPA/Hibernate configuration
 spring.jpa.show-sql=${databaseConfig.showSql || 'true'}
@@ -465,7 +478,6 @@ public class ${upperCamelEntityName}Controller {
                 initFilter += `\t\tthis.queryPredicateMapping.add("${columnName}", "${columnName}", ${dataType}, ${filterOperation});\r\n`
             });
 
-            let setIdNull = '';
 
             if (primaryKeys.length > 0) {
                 let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
@@ -477,10 +489,6 @@ public class ${upperCamelEntityName}Controller {
                 primaryKeys.forEach(col => {
                     let upperColumnName = stringUtil.upperCamel(stringUtil.camelize(col.name));
                     vals.push(`input.get${upperColumnName}() == null`);
-                    if(col.primaryKey && col.autoIncrement)
-                    {
-                        setIdNull = `\r\n\t\tinput.set${upperColumnName}(null);`;
-                    }
                 });
                 let updateValidation = `if(${vals.join(' || ')})
     	{
@@ -678,6 +686,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.text.ParseException;
+import java.util.HashMap;
 
 import org.springframework.data.jpa.domain.Specification;
 import org.slf4j.Logger;
@@ -705,9 +714,41 @@ public class SpecificationUtil {
     public static final String FILTER_OPERATION_EXACT = "exact";
     public static final String FILTER_OPERATION_PARTIAL = "partial";
 
+    public static final String DATE_FORMAT = "yyyy-MM-dd";
+    public static final String DATETIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
+
+    public static final String REGEX_INTEGER = "^-?\\d+$";
+    public static final String REGEX_FLOAT   = "^-?\\d+(\\.\\d+)?$";
+    public static final String REGEX_BOOLEAN = "^(?i:true|false)$";
+
     private static final Logger logger = LoggerFactory.getLogger(SpecificationUtil.class);
-    private static final String DATE_FORMAT = "yyyy-MM-dd";
-    private static final String DATETIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
+
+    /**
+     * Converts a list of {@link DataFilter} objects into a {@link Map}.
+     * <p>
+     * Each entry in the resulting map uses the filter's field name as the key
+     * and the filter's field value as the value. Filters with a {@code null}
+     * field name are ignored.
+     * </p>
+     *
+     * @param dataFilter the list of filters; may be {@code null} or empty
+     * @return a non-null {@link Map} where keys are field names and values are the
+     *         corresponding field values; may be empty if no valid filters are provided
+     */
+    public static Map<String, Object> getFilterFromRequest(List<DataFilter> dataFilter) {
+        Map<String, Object> result = new HashMap<>();
+        if (dataFilter == null || dataFilter.isEmpty()) {
+            return result;
+        }
+        for (DataFilter filter : dataFilter) {
+            String key = filter.getFieldName();
+            Object fieldValue = filter.getFieldValue();
+            if (key != null) {
+                result.put(key, fieldValue);
+            }
+        }
+        return result;
+    }
 
     /**
      * Creates a generic {@link Specification} from a list of {@link DataFilter} to build dynamic queries.
@@ -727,7 +768,8 @@ public class SpecificationUtil {
 
         for (DataFilter filter : dataFilter) {
             String key = filter.getFieldName();
-            String fieldValue = filter.getFieldValue();
+            Object fieldValue = filter.getFieldValue();
+            String valueStr = String.valueOf(fieldValue);
 
             if (key != null && fieldValue != null) {
                 Map<String, String> fieldInfo = filters.get(key);
@@ -743,25 +785,25 @@ public class SpecificationUtil {
                             
                             switch (dataType) {
                                 case DATA_TYPE_LONG:
-                                    return criteriaBuilder.equal(path, Long.parseLong(fieldValue));
+                                    return criteriaBuilder.equal(path, Long.parseLong(valueStr));
                                 case DATA_TYPE_INTEGER:
-                                    return criteriaBuilder.equal(path, Integer.parseInt(fieldValue));
+                                    return criteriaBuilder.equal(path, Integer.parseInt(valueStr));
                                 case DATA_TYPE_DOUBLE:
                                 case DATA_TYPE_FLOAT:
-                                    return criteriaBuilder.equal(path, Double.parseDouble(fieldValue));
+                                    return criteriaBuilder.equal(path, Double.parseDouble(valueStr));
                                 case DATA_TYPE_BOOLEAN:
-                                    return criteriaBuilder.equal(path, Boolean.parseBoolean(fieldValue));
+                                    return criteriaBuilder.equal(path, Boolean.parseBoolean(valueStr));
                                 case DATA_TYPE_DATE:
-                                    Date date = new SimpleDateFormat(DATE_FORMAT).parse(fieldValue);
+                                    Date date = new SimpleDateFormat(DATE_FORMAT).parse(valueStr);
                                     return criteriaBuilder.equal(path, date);
                                 case DATA_TYPE_DATETIME:
-                                    Date dateTime = new SimpleDateFormat(DATETIME_FORMAT).parse(fieldValue);
+                                    Date dateTime = new SimpleDateFormat(DATETIME_FORMAT).parse(valueStr);
                                     return criteriaBuilder.equal(path, dateTime);
                                 case DATA_TYPE_STRING:
                                     if (FILTER_OPERATION_EXACT.equals(filterOperation)) {
                                         return criteriaBuilder.equal(path, fieldValue);
                                     } else if (FILTER_OPERATION_PARTIAL.equals(filterOperation)) {
-                                        return criteriaBuilder.like(criteriaBuilder.lower((Path<String>) path), "%" + fieldValue.toLowerCase() + "%");
+                                        return criteriaBuilder.like(criteriaBuilder.lower((Path<String>) path), "%" + valueStr.toLowerCase() + "%");
                                     }
                                     break;
                                 default:
@@ -781,6 +823,94 @@ public class SpecificationUtil {
             }
         }
         return spec.orElse(null);
+    }
+
+    /**
+     * Retrieves a {@link Date} value from the map using the specified key.
+     * Parsed with {@code yyyy-MM-dd}.
+     */
+    public static Date getDate(Map<String, Object> map, String key) throws ParseException {
+        String valueStr = getString(map, key);
+        if (valueStr == null) return null;
+        return new SimpleDateFormat(DATE_FORMAT).parse(valueStr);
+    }
+
+    /**
+     * Retrieves a {@link Date} value with time from the map using the specified key.
+     * Parsed with {@code yyyy-MM-dd HH:mm:ss}.
+     */
+    public static Date getDateTime(Map<String, Object> map, String key) throws ParseException {
+        String valueStr = getString(map, key);
+        if (valueStr == null) return null;
+        return new SimpleDateFormat(DATETIME_FORMAT).parse(valueStr);
+    }
+
+    /**
+     * Retrieves a {@link Long} value.
+     */
+    @SuppressWarnings("UnnecessaryTemporaryOnConversionFromString")
+    public static Long getLong(Map<String, Object> map, String key) {
+        String valueStr = getString(map, key);
+        if (valueStr == null || !valueStr.matches(REGEX_INTEGER)) return null;
+        return Long.parseLong(valueStr);
+    }
+
+    /**
+     * Retrieves an {@link Integer} value.
+     */
+    @SuppressWarnings("UnnecessaryTemporaryOnConversionFromString")
+    public static Integer getInteger(Map<String, Object> map, String key) {
+        String valueStr = getString(map, key);
+        if (valueStr == null || !valueStr.matches(REGEX_INTEGER)) return null;
+        return Integer.parseInt(valueStr);
+    }
+
+    /**
+     * Retrieves a {@link Double} value.
+     */
+    @SuppressWarnings("UnnecessaryTemporaryOnConversionFromString")
+    public static Double getDouble(Map<String, Object> map, String key) {
+        String valueStr = getString(map, key);
+        if (valueStr == null || !valueStr.matches(REGEX_FLOAT)) return null;
+        return Double.parseDouble(valueStr);
+    }
+
+    /**
+     * Retrieves a {@link Float} value.
+     */
+    @SuppressWarnings("UnnecessaryTemporaryOnConversionFromString")
+    public static Float getFloat(Map<String, Object> map, String key) {
+        String valueStr = getString(map, key);
+        if (valueStr == null || !valueStr.matches(REGEX_FLOAT)) return null;
+        return Float.parseFloat(valueStr);
+    }
+
+    /**
+     * Retrieves a {@link Boolean} value.
+     * Only accepts "true" or "false" (case-insensitive).
+     */
+    @SuppressWarnings({
+        "UnnecessaryTemporaryOnConversionFromString",
+        "DataFlowIssue"
+    })
+    public static Boolean getBoolean(Map<String, Object> map, String key) {
+        String valueStr = getString(map, key);
+        if (valueStr == null || !valueStr.matches(REGEX_BOOLEAN)) return null;
+        return Boolean.parseBoolean(valueStr);
+    }
+
+    /**
+     * Safely retrieves a trimmed String value from map.
+     * Returns null if value is missing, blank, or equals "null".
+     */
+    private static String getString(Map<String, Object> map, String key) {
+        if (map == null || key == null || !map.containsKey(key)) {
+            return null;
+        }
+        Object value = map.get(key);
+        if (value == null) return null;
+        String valueStr = String.valueOf(value).trim();
+        return valueStr.isEmpty() || "null".equalsIgnoreCase(valueStr) ? null : valueStr;
     }
 
     /**
@@ -809,7 +939,6 @@ public class SpecificationUtil {
         return path.get(parts[parts.length - 1]);
     }
 }
-
 `;
         return [{ 
             name: this.createSourceDirectoryFromArtefact(this.packageName) + `utils/SpecificationUtil.java`,
@@ -1840,6 +1969,19 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
         <artifactId>mysql-connector-j</artifactId>
         <scope>runtime</scope>
     </dependency>
+
+    <dependency>
+        <groupId>org.mariadb.jdbc</groupId>
+        <artifactId>mariadb-java-client</artifactId>
+        <version>3.5.1</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>42.7.4</version>
+    </dependency>
+    
     <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>

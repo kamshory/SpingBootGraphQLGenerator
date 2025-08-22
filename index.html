@@ -8,19 +8,30 @@
   <link href="bootstrap/bootstrap.min.css" rel="stylesheet">
   <script src="js/Column.min.js"></script>
   <script src="js/Entity.min.js"></script>
-  <script src="js/StringUtil.js"></script>
-  <script src="js/SQLParser.js"></script>
-  <script src="js/GraphQLSpringGenerator.js"></script>
-  <script src="js/GraphQLSchemaUtils.js"></script>
+  <script src="js/EntityRenderer.min.js"></script>
+  <script src="js/StringUtil.min.js"></script>
+  <script src="js/SQLParser.min.js"></script>
+  <script src="js/GraphQLSpringGenerator.min.js"></script>
+  <script src="js/GraphQLSchemaUtils.min.js"></script>
   <script src="js/SQLConverter.min.js"></script>
   <script src="js/Maven.min.js"></script>
   <script src="js/TableParser.min.js"></script>
   <script src="js/jszip.min.js"></script>
   <script src="js/FileSaver.min.js"></script>
   <script src="js/sql-wasm.min.js"></script>
+  <style>
+    .erd-wrapper{
+      position: relative;
+      max-height: 320px;
+      overflow: auto;
+    }
+    .erd-svg{
+      display: block;
+      margin: auto;
+    }
+  </style>
 </head>
 <body class="bg-light">
-  <!-- ...existing code... -->
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-md-8">
@@ -30,64 +41,115 @@
           </div>
           <div class="card-body">
             <form id="configForm">
+
+              <div class="mb-3">
+                <label for="sqlFile" class="form-label">SQL File</label>
+                <input type="file" class="form-control" id="sqlFile" name="sqlFile" accept=".sql,.sqlite,.db" />
+              </div>
+
+              <div class="mb-3">
+                <label for="maxRelationDepth" class="form-label">Max Relation Depth</label>
+                <input type="number" class="form-control" id="maxRelationDepth" name="maxRelationDepth" value="1" />
+              </div>
+
+              <div class="erd-wrapper">
+                <svg class="erd-svg"></svg>
+              </div>
+
+              <hr />
+              <h5>Package Config</h5>
+
               <div class="mb-3">
                 <label for="packageName" class="form-label">Package Name</label>
-                <input type="text" class="form-control" id="packageName" name="packageName" value="com.example.servicegen" />
+                <input type="text" class="form-control" id="packageName" name="packageName" value="" />
               </div>
               <div class="mb-3">
                 <label for="groupId" class="form-label">Group ID</label>
-                <input type="text" class="form-control" id="groupId" name="groupId" value="com.example" />
+                <input type="text" class="form-control" id="groupId" name="groupId" value="" />
               </div>
               <div class="mb-3">
                 <label for="artifactId" class="form-label">Artifact ID</label>
-                <input type="text" class="form-control" id="artifactId" name="artifactId" value="servicegen" />
+                <input type="text" class="form-control" id="artifactId" name="artifactId" value="" />
               </div>
               <div class="mb-3">
                 <label for="serviceName" class="form-label">Service Name</label>
-                <input type="text" class="form-control" id="serviceName" name="serviceName" value="Service Generator" />
+                <input type="text" class="form-control" id="serviceName" name="serviceName" value="" />
               </div>
               <div class="mb-3">
                 <label for="serviceDescription" class="form-label">Service Description</label>
-                <input type="text" class="form-control" id="serviceDescription" name="serviceDescription" value="A service generator for Spring GraphQL" />
+                <input type="text" class="form-control" id="serviceDescription" name="serviceDescription" value="" />
               </div>
               <div class="mb-3">
                 <label for="javaVersion" class="form-label">Java Version</label>
                 <input type="text" class="form-control" id="javaVersion" name="javaVersion" value="21" />
               </div>
-              <div class="mb-3">
-                <label for="version" class="form-label">Version</label>
-                <input type="text" class="form-control" id="version" name="version" value="1.0.0" />
-              </div>
+              
 
               <hr />
               <h5>Application Config</h5>
               <div class="mb-3">
-                <label for="appPort" class="form-label">Port</label>
-                <input type="number" class="form-control" id="appPort" name="appPort" value="8080" />
+                <label for="version" class="form-label">Version</label>
+                <input type="text" class="form-control" id="version" name="version" value="" />
               </div>
               <div class="mb-3">
-                <label for="maxRelationDepth" class="form-label">Max Relation Depth</label>
-                <input type="number" class="form-control" id="maxRelationDepth" name="maxRelationDepth" value="3" />
-              </div>
+                <label for="appPort" class="form-label">Port</label>
+                <input type="number" class="form-control" id="appPort" name="appPort" value="" />
+              </div>          
 
               <hr />
               <h5>Database Config</h5>
               <div class="mb-3">
                 <label for="dbUrl" class="form-label">JDBC URL</label>
-                <input type="text" class="form-control" id="dbUrl" name="dbUrl" value="jdbc:mysql://localhost:3306/mydb" />
+                <input type="text" class="form-control" id="dbUrl" name="dbUrl" value="" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="dbUsername" class="form-label">Username</label>
-                <input type="text" class="form-control" id="dbUsername" name="dbUsername" value="root" />
+                <input type="text" class="form-control" id="dbUsername" name="dbUsername" value="" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="dbPassword" class="form-label">Password</label>
-                <input type="password" class="form-control" id="dbPassword" name="dbPassword" value="password" />
+                <input type="password" class="form-control" id="dbPassword" name="dbPassword" value="" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="dbDriver" class="form-label">Driver Class Name</label>
-                <input type="text" class="form-control" id="dbDriver" name="dbDriver" value="com.mysql.cj.jdbc.Driver" />
+                <input type="text" class="form-control" id="dbDriver" name="dbDriver" value="" list="jdbcDrivers" autocomplete="off" />
               </div>
+              <datalist id="jdbcDrivers">
+                <!-- MySQL -->
+                <option value="com.mysql.cj.jdbc.Driver">MySQL (Connector/J 8+)</option>
+                <option value="com.mysql.jdbc.Driver">MySQL (Connector/J 5, deprecated)</option>
+                
+                <!-- MariaDB -->
+                <option value="org.mariadb.jdbc.Driver">MariaDB</option>
+                
+                <!-- PostgreSQL -->
+                <option value="org.postgresql.Driver">PostgreSQL</option>
+                
+                <!-- SQLite -->
+                <option value="org.sqlite.JDBC">SQLite</option>
+                
+                <!-- Oracle -->
+                <option value="oracle.jdbc.OracleDriver">Oracle</option>
+                
+                <!-- Microsoft SQL Server -->
+                <option value="com.microsoft.sqlserver.jdbc.SQLServerDriver">SQL Server</option>
+                
+                <!-- IBM DB2 -->
+                <option value="com.ibm.db2.jcc.DB2Driver">IBM DB2</option>
+                
+                <!-- H2 Database -->
+                <option value="org.h2.Driver">H2 Database</option>
+                
+                <!-- Apache Derby -->
+                <option value="org.apache.derby.jdbc.EmbeddedDriver">Apache Derby (Embedded)</option>
+                <option value="org.apache.derby.jdbc.ClientDriver">Apache Derby (Client)</option>
+                
+                <!-- Firebird -->
+                <option value="org.firebirdsql.jdbc.FBDriver">Firebird</option>
+                
+                <!-- Sybase -->
+                <option value="com.sybase.jdbc4.jdbc.SybDriver">Sybase (SAP ASE)</option>
+              </datalist>
               <div class="mb-3">
                 <label for="dbShowSql" class="form-label">Show SQL</label>
                 <select class="form-control" id="dbShowSql" name="dbShowSql">
@@ -97,13 +159,57 @@
               </div>
               <div class="mb-3">
                 <label for="dbDialect" class="form-label">Hibernate Dialect</label>
-                <input type="text" class="form-control" id="dbDialect" name="dbDialect" value="org.hibernate.dialect.MySQL8Dialect" />
+                <input type="text" class="form-control" id="dbDialect" name="dbDialect" value="" list="hibernateDialects" autocomplete="off" />
               </div>
+              <datalist id="hibernateDialects">
+                <!-- MySQL -->
+                <option value="org.hibernate.dialect.MySQLDialect">MySQL (Generic)</option>
+                <option value="org.hibernate.dialect.MySQL55Dialect">MySQL 5.5</option>
+                <option value="org.hibernate.dialect.MySQL57Dialect">MySQL 5.7</option>
+                <option value="org.hibernate.dialect.MySQL8Dialect">MySQL 8</option>
 
-              <div class="mb-3">
-                <label for="sqlFile" class="form-label">SQL File</label>
-                <input type="file" class="form-control" id="sqlFile" name="sqlFile" accept=".sql,.sqlite,.db" />
-              </div>
+                <!-- MariaDB -->
+                <option value="org.hibernate.dialect.MariaDBDialect">MariaDB (Generic)</option>
+                <option value="org.hibernate.dialect.MariaDB53Dialect">MariaDB 5.3+</option>
+                <option value="org.hibernate.dialect.MariaDB102Dialect">MariaDB 10.2+</option>
+
+                <!-- PostgreSQL -->
+                <option value="org.hibernate.dialect.PostgreSQLDialect">PostgreSQL (Generic)</option>
+                <option value="org.hibernate.dialect.PostgreSQL81Dialect">PostgreSQL 8.1+</option>
+                <option value="org.hibernate.dialect.PostgreSQL95Dialect">PostgreSQL 9.5+</option>
+                <option value="org.hibernate.dialect.PostgreSQL10Dialect">PostgreSQL 10+</option>
+                <option value="org.hibernate.dialect.PostgreSQL94Dialect">PostgreSQL 9.4+</option>
+
+                <!-- SQLite (tidak resmi, pakai custom dialect) -->
+                <option value="org.hibernate.dialect.SQLiteDialect">SQLite (Custom, non-official)</option>
+
+                <!-- Oracle -->
+                <option value="org.hibernate.dialect.OracleDialect">Oracle (Generic)</option>
+                <option value="org.hibernate.dialect.Oracle9iDialect">Oracle 9i</option>
+                <option value="org.hibernate.dialect.Oracle10gDialect">Oracle 10g</option>
+                <option value="org.hibernate.dialect.Oracle12cDialect">Oracle 12c</option>
+
+                <!-- SQL Server -->
+                <option value="org.hibernate.dialect.SQLServerDialect">SQL Server (Generic)</option>
+                <option value="org.hibernate.dialect.SQLServer2008Dialect">SQL Server 2008</option>
+                <option value="org.hibernate.dialect.SQLServer2012Dialect">SQL Server 2012</option>
+                <option value="org.hibernate.dialect.SQLServer2016Dialect">SQL Server 2016</option>
+
+                <!-- H2 -->
+                <option value="org.hibernate.dialect.H2Dialect">H2 Database</option>
+
+                <!-- Derby -->
+                <option value="org.hibernate.dialect.DerbyDialect">Apache Derby</option>
+
+                <!-- DB2 -->
+                <option value="org.hibernate.dialect.DB2Dialect">IBM DB2 (Generic)</option>
+                <option value="org.hibernate.dialect.DB297Dialect">IBM DB2 9.7+</option>
+                <option value="org.hibernate.dialect.DB2105Dialect">IBM DB2 10.5+</option>
+
+                <!-- Sybase -->
+                <option value="org.hibernate.dialect.SybaseDialect">Sybase ASE</option>
+              </datalist>
+              
               
               <button type="submit" class="btn btn-primary w-100">Generate</button>
             </form>
@@ -114,33 +220,8 @@
       </div>
     </div>
   </div>
-  <!-- ...existing code... -->
-  <script>
-    let stringUtil = new StringUtil();
-    let generator = new GraphQLSpringGenerator();
-    let sqlParser = new SQLParser();
-    let util = new GraphQLSchemaUtils();
-    document.addEventListener('DOMContentLoaded', () => {
-      const form = document.getElementById('configForm');
-      form.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const formData = new FormData(form);
-        const config = {
-          packageName: formData.get('packageName'),
-          groupId: formData.get('groupId'),
-          artifactId: formData.get('artifactId'),
-          serviceName: formData.get('serviceName'),
-          serviceDescription: formData.get('serviceDescription'),
-          javaVersion: formData.get('javaVersion'), 
-          version: formData.get('version'),
-          maxRelationDepth: parseInt(formData.get('maxRelationDepth')) || 3,
-        };
-        const sqlFile = formData.get('sqlFile');
-        sqlParser.importSQLFile(sqlFile, (model) => {
-          generator.createZipFile(model, config, document.querySelector('#artifactId').value + ".zip");
-        });
-      });
-    });
+  <script src="js/Main.min.js">
+    
   </script>
   <!-- Add Bootstrap JS (optional, for components) -->
   <script src="bootstrap/bootstrap.bundle.min.js"></script>
