@@ -824,4 +824,73 @@ class EntityRenderer {
         return this.svg;
     }
 
+    createDescription(model, selector)
+    {
+        let _this = this;
+        let wrapper = document.querySelector(selector);
+        wrapper.innerHTML = '';
+        if(model.entities)
+        {
+            model.entities.forEach(entity => {
+                _this.addDescription(entity, wrapper);
+            });
+        }
+    }
+
+    addDescription(entity, wrapper) {
+        let container = document.createElement("div");
+        container.classList.add("mb-4");
+
+        let title = document.createElement("h5");
+        title.textContent = entity.name;
+        container.appendChild(title);
+
+        let table = document.createElement("table");
+        table.className = "table table-bordered table-striped table-sm";
+
+        // Tambahkan styling khusus
+        table.style.width = "100%";
+        table.style.tableLayout = "fixed"; // supaya persen terpakai rata
+
+        let thead = document.createElement("thead");
+        thead.innerHTML = `
+            <tr>
+                <th style="width: 30%;">Column</th>
+                <th style="width: 25%;">Type</th>
+                <th style="width: 10%;">PK</th>
+                <th style="width: 15%;">Nullable</th>
+                <th style="width: 20%;">Default</th>
+            </tr>
+        `;
+
+        table.appendChild(thead);
+
+        let tbody = document.createElement("tbody");
+        entity.columns.forEach(col => {
+            let tr = document.createElement("tr");
+
+            // gabungkan type + length jika ada
+            let typeDisplay = col.type || "";
+            if (col.length != null && col.length !== "") {
+                typeDisplay += `(${col.length})`;
+            }
+
+            tr.innerHTML = `
+                <td>${col.name || ""}</td>
+                <td>${typeDisplay}</td>
+                <td style="text-align: center;">${col.primaryKey ? "✓" : ""}</td>
+                <td style="text-align: center;">${col.nullable ? "YES" : "NO"}</td>
+                <td>${col.defaultValue != null ? col.defaultValue : ""}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+
+        container.appendChild(table);
+        wrapper.appendChild(container);
+    }
+
+
+
 }
