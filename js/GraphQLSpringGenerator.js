@@ -768,8 +768,8 @@ public class SpecificationUtil {
     public static final String DATE_FORMAT = "yyyy-MM-dd";
     public static final String DATETIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
 
-    public static final String REGEX_INTEGER = "^-?\\d+$";
-    public static final String REGEX_FLOAT   = "^-?\\d+(\\.\\d+)?$";
+    public static final String REGEX_INTEGER = "^-?\\\\d+$";
+    public static final String REGEX_FLOAT   = "^-?\\\\d+(\\\\.\\\\d+)?$";
     public static final String REGEX_BOOLEAN = "^(?i:true|false)$";
 
     private static final Logger logger = LoggerFactory.getLogger(SpecificationUtil.class);
@@ -973,7 +973,7 @@ public class SpecificationUtil {
      * @return The final Path object to the attribute.
      */
     private static Path<?> resolvePath(Root<?> root, String fieldName) {
-        String[] parts = fieldName.split("\\\\.");
+        String[] parts = fieldName.split("\\\\\\\\.");
         Path<?> path = root;
 
         // Iterate through all parts of the path

@@ -134,6 +134,8 @@ window.addEventListener('resize', () => {
                 width, 
                 drawRelationship
             );
+
+            entityRenderer.createDescription(generator.getModel(), '#erd-description');
         }
     }, 30); 
 });
@@ -175,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updatedWidth = 480;
                 }
                 entityRenderer.createERD(model, updatedWidth, drawRelationship);
+                entityRenderer.createDescription(model, '#erd-description');
             });
         }
     });
@@ -189,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatedWidth = 480;
             }
             entityRenderer.createERD(model, updatedWidth, drawRelationship);
+            entityRenderer.createDescription(model, '#erd-description');
         });
     }
 

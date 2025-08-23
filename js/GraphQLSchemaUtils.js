@@ -222,7 +222,6 @@ class GraphQLSchemaUtils {
      *
      * @example
      * const schema = buildGraphQLSchema(entities, false);
-     * console.log(schema);
      */
     buildGraphQLSchema(entities, removeIdFields = true, paginationMode = "offset") {
         const sqlToGraphQL = {
