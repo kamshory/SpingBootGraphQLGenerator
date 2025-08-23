@@ -296,7 +296,7 @@ class TableParser {
         const f = line.toUpperCase().replace(/\s+/g, ' ').trim();
         let ai = false;
         // Check for MySQL/MariaDB's AUTO_INCREMENT
-        ai = f.includes('AUTO_INCREMENT');
+        ai = f.includes('AUTO_INCREMENT') || f.includes('AUTOINCREMENT');
         
         // Check for PostgreSQL's SERIAL, BIGSERIAL, or nextval() function
         if(!ai)
