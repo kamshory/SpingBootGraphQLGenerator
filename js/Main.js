@@ -171,6 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sqlFile = formData.get('sqlFile');
         if (sqlFile) {
             sqlParser.importSQLFile(sqlFile, (model) => {
+                model.entities = model.entities.filter(entity => entity.name !== 'sqlite_sequence');
                 applyModel(model);
                 if(updatedWidth < 480)
                 {
@@ -186,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sqlFileInit = formDataInit.get('sqlFile');
     if (sqlFileInit) {
         sqlParser.importSQLFile(sqlFileInit, (model) => {
+            model.entities = model.entities.filter(entity => entity.name !== 'sqlite_sequence');
             applyModel(model);
             if(updatedWidth < 480)
             {
