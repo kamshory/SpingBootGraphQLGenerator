@@ -123,6 +123,8 @@ window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
         const wrapper = document.querySelector('.erd-wrapper');
+        let tbody = document.querySelector('#entity-selection-body');
+        
         if (wrapper) {
             let width = wrapper.clientWidth;
             if(width < 480)
@@ -136,9 +138,48 @@ window.addEventListener('resize', () => {
             );
 
             entityRenderer.createDescription(generator.getModel(), '#erd-description');
+            createSelector(tbody, generator.getModel());
         }
     }, 30); 
 });
+
+function createSelector(tbody, model)
+{
+    tbody.innerHTML = '';
+    if(model && model.entities)
+    {
+        model.entities.forEach(entity => {
+            let tr = document.createElement('tr');
+            let td1 = document.createElement('td');
+            let td2 = document.createElement('td');
+            let td3 = document.createElement('td');
+            
+            let input = document.createElement('input');
+            input.setAttribute('type', 'checkbox');
+            input.setAttribute('checked', 'checked');
+            input.classList.add('selected-entity');
+            input.value = entity.name;
+            
+            td1.appendChild(input);
+            td2.innerHTML = entity.name;
+            
+            let result = '';
+            let primaryKeys = entity.columns.filter(column => column.primaryKey);
+            if(primaryKeys)
+            {
+                let names = primaryKeys.map(obj => obj.name);
+                result = names.join(', ');
+            }
+
+            td3.innerHTML = result;
+            tr.appendChild(td1);
+            tr.appendChild(td2);
+            tr.appendChild(td3);
+            tbody.appendChild(tr);
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('configForm');
     const packageNameInput = document.getElementById("packageName");
@@ -170,6 +211,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData(form);
         const sqlFile = formData.get('sqlFile');
         if (sqlFile) {
+            let tbody = document.querySelector('#entity-selection-body');
+            
             sqlParser.importSQLFile(sqlFile, (model) => {
                 model.entities = model.entities.filter(entity => entity.name !== 'sqlite_sequence');
                 applyModel(model);
@@ -179,13 +222,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 entityRenderer.createERD(model, updatedWidth, drawRelationship);
                 entityRenderer.createDescription(model, '#erd-description');
+                createSelector(tbody, model);
             });
         }
+    });
+
+
+    const checkAllHeader = document.querySelector('.check-all');
+    checkAllHeader.checked = true;
+    
+    checkAllHeader.addEventListener('change', function() {
+        const checkboxesBody = document.querySelectorAll('#entity-selection-body input[type="checkbox"]');
+        const isChecked = this.checked;
+        checkboxesBody.forEach(checkbox => {
+            checkbox.checked = isChecked;
+        });
     });
 
     const formDataInit = new FormData(form);
     const sqlFileInit = formDataInit.get('sqlFile');
     if (sqlFileInit) {
+        let tbody = document.querySelector('#entity-selection-body');
+        
         sqlParser.importSQLFile(sqlFileInit, (model) => {
             model.entities = model.entities.filter(entity => entity.name !== 'sqlite_sequence');
             applyModel(model);
@@ -195,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             entityRenderer.createERD(model, updatedWidth, drawRelationship);
             entityRenderer.createDescription(model, '#erd-description');
+            createSelector(tbody, model);
         });
     }
 
@@ -211,6 +270,30 @@ document.addEventListener('DOMContentLoaded', () => {
             version: formData.get('version'),
             maxRelationDepth: parseInt(formData.get('maxRelationDepth')) || 3,
         };
-        generator.createZipFile(null, config, document.querySelector('#artifactId').value + ".zip");
+        let selectedModel = {entities: []};
+        const checkboxesBody = document.querySelectorAll('#entity-selection-body input[type="checkbox"]');
+        if(checkboxesBody.length)
+        {
+            let selected = [];
+            checkboxesBody.forEach(input => {
+                if(input.checked)
+                {
+                    selected.push(input.value);
+                }
+            });
+            
+            let model = generator.getModel();
+            if(model && model.entities)
+            {
+                model.entities.forEach(entity => {
+                    if(selected.includes(entity.name))
+                    {
+                        selectedModel.entities.push(entity); 
+                    }
+                });
+            }
+        }
+        
+        generator.createZipFile(selectedModel, config, document.querySelector('#artifactId').value + ".zip");
     });
 });

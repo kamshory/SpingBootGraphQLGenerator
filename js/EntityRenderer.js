@@ -875,7 +875,6 @@ class EntityRenderer {
             if (col.length != null && col.length !== "") {
                 typeDisplay += `(${col.length})`;
             }
-            console.log(col)
 
             tr.innerHTML = `
                 <td>${col.name || ""}</td>
