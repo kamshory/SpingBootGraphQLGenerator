@@ -855,9 +855,10 @@ class EntityRenderer {
         let thead = document.createElement("thead");
         thead.innerHTML = `
             <tr>
-                <th style="width: 30%;">Column</th>
-                <th style="width: 25%;">Type</th>
+                <th style="width: 25%;">Column</th>
+                <th style="width: 20%;">Type</th>
                 <th style="width: 10%;">PK</th>
+                <th style="width: 10%;">Serial</th>
                 <th style="width: 15%;">Nullable</th>
                 <th style="width: 20%;">Default</th>
             </tr>
@@ -874,11 +875,13 @@ class EntityRenderer {
             if (col.length != null && col.length !== "") {
                 typeDisplay += `(${col.length})`;
             }
+            console.log(col)
 
             tr.innerHTML = `
                 <td>${col.name || ""}</td>
                 <td>${typeDisplay}</td>
                 <td style="text-align: center;">${col.primaryKey ? "✓" : ""}</td>
+                <td style="text-align: center;">${col.autoIncrement ? "✓" : ""}</td>
                 <td style="text-align: center;">${col.nullable ? "YES" : "NO"}</td>
                 <td>${col.defaultValue != null ? col.defaultValue : ""}</td>
             `;
@@ -890,6 +893,7 @@ class EntityRenderer {
         container.appendChild(table);
         wrapper.appendChild(container);
     }
+
 
 
 
