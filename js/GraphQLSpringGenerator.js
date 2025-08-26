@@ -13,6 +13,7 @@ class GraphQLSpringGenerator {
         this.version = null;
         this.maxRelationDepth = 3; // Default max depth for nested relations
         this.model = null;
+        this.selectedModel = null;
     }
 
     /**
@@ -141,7 +142,11 @@ class GraphQLSpringGenerator {
         this.maxRelationDepth = 3; // Default max depth for nested relations
         if(model)
         {
-            this.model = model;
+            this.selectedModel = model;
+        }
+        else
+        {
+            this.selectedModel = this.model;
         }
 
         const loadingMessage = document.getElementById('loading');
@@ -376,7 +381,7 @@ public class CorsConfig implements WebMvcConfigurer {
      * @returns {Array} Array of controller file objects.
      */
     generateControllerFiles() {
-    let entities = this.model.entities;
+    let entities = this.selectedModel.entities;
     let file = [];
     entities.forEach(entity => {
         let entityName = entity.name;
@@ -511,7 +516,7 @@ public class ${upperCamelEntityName}Controller {
      */
     generateServiceFiles() {
         let _this = this;
-        let entities = this.model.entities;
+        let entities = this.selectedModel.entities;
         let file = [];
         entities.forEach(entity => {
             let entityName = entity.name;
@@ -1085,7 +1090,7 @@ public class DataOrder {
      * Creates normal repository and Input repository.
      */
     generateConnectionFiles() {
-        let entities = this.model.entities;
+        let entities = this.selectedModel.entities;
         let file = [];
         entities.forEach(entity => {
             let entityNameCamel = stringUtil.camelize(entity.name);
@@ -1153,7 +1158,7 @@ public class ${upperCamelEntityName}Connection
      * Creates normal repository and Input repository.
      */
     generateRepositoryFiles() {
-        let entities = this.model.entities;
+        let entities = this.selectedModel.entities;
         let file = [];
         let _this = this;
 
@@ -1250,7 +1255,7 @@ public interface ${upperCamelEntityName}InputRepository extends JpaRepository<${
 
     generateEntityFiles() {
         let _this = this;
-        let entities = this.model.entities;
+        let entities = this.selectedModel.entities;
         let file = [];
 
         entities.forEach(entity => {

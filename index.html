@@ -21,7 +21,7 @@
   <script src="js/sql-wasm.min.js"></script>
   <script src="js/Main.min.js"></script>
   <style>
-    .erd-wrapper, #erd-description{
+    .erd-wrapper, #erd-description, #entity-selection{
       position: relative;
       max-height: 320px;
       overflow: auto;
@@ -65,6 +65,11 @@
                     Description
                   </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="selection-tab" data-bs-toggle="tab" data-bs-target="#selection" type="button" role="tab" aria-controls="description" aria-selected="false">
+                    Selection
+                  </button>
+                </li>
               </ul>
 
               <div class="tab-content p-3 border border-top-0 rounded-bottom">
@@ -86,6 +91,23 @@
                       </tr>
                       </thead>
                       <tbody id="erd-description-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              
+              
+              <!-- Tab: Selection -->
+                <div class="tab-pane fade" id="selection" role="tabpanel" aria-labelledby="selection-tab">
+                  <div id="entity-selection">
+                    <table class="table table-sm table-striped align-middle">
+                      <thead>
+                      <tr>
+                        <th width="20"><input type="checkbox" class="check-all" checked></th>
+                        <th width="50%">Entity Name</th>
+                        <th>Primary Keys</th>
+                      </tr>
+                      </thead>
+                      <tbody id="entity-selection-body"></tbody>
                     </table>
                   </div>
                 </div>
