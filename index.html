@@ -10,6 +10,7 @@
   <script src="js/Entity.min.js"></script>
   <script src="js/EntityRenderer.min.js"></script>
   <script src="js/StringUtil.min.js"></script>
+  <script src="js/TypeUtil.min.js"></script>
   <script src="js/SQLParser.min.js"></script>
   <script src="js/GraphQLSpringGenerator.min.js"></script>
   <script src="js/GraphQLSchemaUtils.min.js"></script>
@@ -118,23 +119,23 @@
 
               <div class="mb-3">
                 <label for="packageName" class="form-label">Package Name</label>
-                <input type="text" class="form-control" id="packageName" name="packageName" value="" autocomplete="off" />
+                <input type="text" class="form-control" id="packageName" name="packageName" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="groupId" class="form-label">Group ID</label>
-                <input type="text" class="form-control" id="groupId" name="groupId" value="" autocomplete="off" />
+                <input type="text" class="form-control" id="groupId" name="groupId" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="artifactId" class="form-label">Artifact ID</label>
-                <input type="text" class="form-control" id="artifactId" name="artifactId" value="" autocomplete="off" />
+                <input type="text" class="form-control" id="artifactId" name="artifactId" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="serviceName" class="form-label">Service Name</label>
-                <input type="text" class="form-control" id="serviceName" name="serviceName" value="" autocomplete="off" />
+                <input type="text" class="form-control" id="serviceName" name="serviceName" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="serviceDescription" class="form-label">Service Description</label>
-                <input type="text" class="form-control" id="serviceDescription" name="serviceDescription" value="" autocomplete="off" />
+                <input type="text" class="form-control" id="serviceDescription" name="serviceDescription" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="javaVersion" class="form-label">Java Version</label>
@@ -146,30 +147,30 @@
               <h5>Application Config</h5>
               <div class="mb-3">
                 <label for="version" class="form-label">Version</label>
-                <input type="text" class="form-control" id="version" name="version" value="" autocomplete="off" />
+                <input type="text" class="form-control" id="version" name="version" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="appPort" class="form-label">Port</label>
-                <input type="number" class="form-control" id="appPort" name="appPort" value="" autocomplete="off" />
+                <input type="number" class="form-control" id="appPort" name="appPort" autocomplete="off" />
               </div>          
 
               <hr />
               <h5>Database Config</h5>
               <div class="mb-3">
                 <label for="dbUrl" class="form-label">JDBC URL</label>
-                <input type="text" class="form-control" id="dbUrl" name="dbUrl" value="" autocomplete="off" autocomplete="off" />
+                <input type="text" class="form-control" id="dbUrl" name="dbUrl" autocomplete="off" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="dbUsername" class="form-label">Username</label>
-                <input type="text" class="form-control" id="dbUsername" name="dbUsername" value="" autocomplete="off" />
+                <input type="text" class="form-control" id="dbUsername" name="dbUsername" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="dbPassword" class="form-label">Password</label>
-                <input type="password" class="form-control" id="dbPassword" name="dbPassword" value="" autocomplete="off" />
+                <input type="password" class="form-control" id="dbPassword" name="dbPassword" autocomplete="off" />
               </div>
               <div class="mb-3">
                 <label for="dbDriver" class="form-label">Driver Class Name</label>
-                <input type="text" class="form-control" id="dbDriver" name="dbDriver" value="" list="jdbcDrivers" autocomplete="off" />
+                <input type="text" class="form-control" id="dbDriver" name="dbDriver" list="jdbcDrivers" autocomplete="off" />
               </div>
               <datalist id="jdbcDrivers">
                 <!-- MySQL -->
@@ -216,7 +217,7 @@
               </div>
               <div class="mb-3">
                 <label for="dbDialect" class="form-label">Hibernate Dialect</label>
-                <input type="text" class="form-control" id="dbDialect" name="dbDialect" value="" list="hibernateDialects" autocomplete="off" />
+                <input type="text" class="form-control" id="dbDialect" name="dbDialect" list="hibernateDialects" autocomplete="off" />
               </div>
               <datalist id="hibernateDialects">
                 <!-- MySQL -->

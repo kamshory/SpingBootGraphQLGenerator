@@ -192,41 +192,12 @@ class GraphQLSpringGenerator {
         if (pk) {
             return {
                 primaryKeyName: pk.name,
-                primaryKeyCamel: stringUtil.camelize(pk.name),
+                primaryKeyCamel: StringUtil.camelize(pk.name),
                 primaryKeyType: pk.type,
-                primaryKeyJavaType: this.getJavaType(pk.type)
+                primaryKeyJavaType: TypeUtil.getJavaType(pk.type)
             };
         }
         return null;
-    }
-
-    /**
-     * Maps SQL column type to Java type.
-     * @param {string} type - The SQL column type.
-     * @returns {string} The corresponding Java type.
-     */
-    getJavaType(type) {
-        let lowercase = type.toLowerCase();
-        if (lowercase.indexOf("int") !== -1 || lowercase.indexOf("integer") !== -1 || lowercase.indexOf("tinyint") !== -1) {
-            return "Long";
-        } else if (lowercase.indexOf("long") !== -1 || lowercase.indexOf("bigint") !== -1) {
-            return "Long";
-        } else if (lowercase.indexOf("string") !== -1 || lowercase.indexOf("varchar") !== -1 || lowercase.indexOf("text") !== -1) {
-            return "String";
-        } else if (lowercase.indexOf("boolean") !== -1) {
-            return "Boolean";
-        } else if (lowercase.indexOf("date") !== -1 || lowercase.indexOf("timestamp") !== -1) {
-            return "Date";
-        } else if (lowercase.indexOf("double") !== -1 || lowercase.indexOf("float") !== -1) {
-            return "Double";
-        } else if (lowercase.indexOf("uuid") !== -1) {
-            return "UUID";
-        } else if (lowercase.indexOf("bigdecimal") !== -1) {
-            return "BigDecimal";
-        } else if (lowercase.indexOf("number") !== -1 || lowercase.indexOf("real") !== -1 || lowercase.indexOf("decimal") !== -1 || lowercase.indexOf("numeric") !== -1) {
-            return "Double";
-        }
-        return "Object";
     }
 
     /**
@@ -385,13 +356,13 @@ public class CorsConfig implements WebMvcConfigurer {
     let file = [];
     entities.forEach(entity => {
         let entityName = entity.name;
-        let entityNameCamel = stringUtil.camelize(entityName);
-        let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
+        let entityNameCamel = StringUtil.camelize(entityName);
+        let upperCamelEntityName = StringUtil.upperCamel(entityNameCamel);
         let primaryKeys = this.getPrimaryKeys(entity);
 
         if (primaryKeys.length > 0) {
-            let paramList = primaryKeys.map(pk => `@Argument ${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
-            let callParams = primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ');
+            let paramList = primaryKeys.map(pk => `@Argument ${TypeUtil.getJavaType(pk.type)} ${StringUtil.camelize(pk.name)}`).join(', ');
+            let callParams = primaryKeys.map(pk => StringUtil.camelize(pk.name)).join(', ');
             
 
             let controllerContent = `package ${this.packageName}.controller;
@@ -520,30 +491,30 @@ public class ${upperCamelEntityName}Controller {
         let file = [];
         entities.forEach(entity => {
             let entityName = entity.name;
-            let entityNameCamel = stringUtil.camelize(entityName);
-            let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
+            let entityNameCamel = StringUtil.camelize(entityName);
+            let upperCamelEntityName = StringUtil.upperCamel(entityNameCamel);
             let primaryKeys = this.getPrimaryKeys(entity);
             
             let initFilter = '';
             
             entity.columns.forEach(column => {
-                let dt = _this.getDataType(column.type);
-                let dataType = _this.getDataTypeConstant(dt);
-                let filterOperation = _this.getFilterOperationConstant(_this.getFilterType(dt));
-                let columnName = stringUtil.camelize(column.name);
+                let jt = TypeUtil.getJavaType(column.type);
+                let dataType = _this.getDataTypeConstant(jt);
+                let filterOperation = _this.getFilterOperationConstant(_this.getFilterType(jt));
+                let columnName = StringUtil.camelize(column.name);
                 initFilter += `\t\tthis.queryPredicateMapping.add("${columnName}", "${columnName}", ${dataType}, ${filterOperation});\r\n`
             });
 
 
             if (primaryKeys.length > 0) {
-                let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
-                let callParams = primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ');
-                let callParamNames = '"'+primaryKeys.map(pk => stringUtil.camelize(pk.name)).join('", "')+'"';
-                let methodNameSuffix = primaryKeys.map(pk => stringUtil.upperCamel(stringUtil.camelize(pk.name))).join('And');
+                let paramList = primaryKeys.map(pk => `${TypeUtil.getJavaType(pk.type)} ${StringUtil.camelize(pk.name)}`).join(', ');
+                let callParams = primaryKeys.map(pk => StringUtil.camelize(pk.name)).join(', ');
+                let callParamNames = '"'+primaryKeys.map(pk => StringUtil.camelize(pk.name)).join('", "')+'"';
+                let methodNameSuffix = primaryKeys.map(pk => StringUtil.upperCamel(StringUtil.camelize(pk.name))).join('And');
                 
                 let vals = [];
                 primaryKeys.forEach(col => {
-                    let upperColumnName = stringUtil.upperCamel(stringUtil.camelize(col.name));
+                    let upperColumnName = StringUtil.upperCamel(StringUtil.camelize(col.name));
                     vals.push(`input.get${upperColumnName}() == null`);
                 });
                 let updateValidation = `if(${vals.join(' || ')})
@@ -634,7 +605,7 @@ ${initFilter}
     /**
      * Retrieves ${upperCamelEntityName} record matching the given primary key.
      *
-     * @param ${primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ')} the primary key value(s) used for filtering.
+     * @param ${primaryKeys.map(pk => StringUtil.camelize(pk.name)).join(', ')} the primary key value(s) used for filtering.
      * @return a list of matching ${upperCamelEntityName} entities.
      */
     public ${upperCamelEntityName} get${upperCamelEntityName}(${paramList}) {
@@ -650,7 +621,7 @@ ${initFilter}
     public ${upperCamelEntityName} create${upperCamelEntityName}(${upperCamelEntityName}Create input) {
         ${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(${upperCamelEntityName}Create.createEntity(input));
         return ${entityNameCamel}Repository.findOneBy${methodNameSuffix}(
-            ${primaryKeys.map(pk => `saved.get${stringUtil.upperCamel(stringUtil.camelize(pk.name))}()`).join(', ')}
+            ${primaryKeys.map(pk => `saved.get${StringUtil.upperCamel(StringUtil.camelize(pk.name))}()`).join(', ')}
         );
     }
 
@@ -663,14 +634,14 @@ ${initFilter}
     public ${upperCamelEntityName} update${upperCamelEntityName}(${upperCamelEntityName}Update input) {
         ${updateValidation}${upperCamelEntityName}Input saved = ${entityNameCamel}InputRepository.save(${upperCamelEntityName}Update.createEntity(input));
         return ${entityNameCamel}Repository.findOneBy${methodNameSuffix}(
-            ${primaryKeys.map(pk => `saved.get${stringUtil.upperCamel(stringUtil.camelize(pk.name))}()`).join(', ')}
+            ${primaryKeys.map(pk => `saved.get${StringUtil.upperCamel(StringUtil.camelize(pk.name))}()`).join(', ')}
         );
     }
 
     /**
      * Deletes the {@link ${upperCamelEntityName}} record that matches the given primary key(s).
      *
-     * @param ${primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ')} the primary key value(s) of the record to delete.
+     * @param ${primaryKeys.map(pk => StringUtil.camelize(pk.name)).join(', ')} the primary key value(s) of the record to delete.
      */
     @Transactional
     public void delete${upperCamelEntityName}(${paramList}) {
@@ -1055,7 +1026,7 @@ public class DataOrder {
         // Periksa kolom di entitas utama
         entity.columns.forEach(col => {
             if (this.isForeignKey(entities, entity, col) && !isCompositeKey) {
-                let relationName = stringUtil.camelize(col.name.replace(/_id$/i, ""));
+                let relationName = StringUtil.camelize(col.name.replace(/_id$/i, ""));
                 let fullPath = prefix ? `${prefix}.${relationName}` : relationName;
                 relations.push(fullPath);
 
@@ -1069,7 +1040,7 @@ public class DataOrder {
         
         entity.columns.forEach(col => {
             if (isCompositeKey) {
-                let relationName = stringUtil.camelize(col.name.replace(/_id$/i, ""));
+                let relationName = StringUtil.camelize(col.name.replace(/_id$/i, ""));
                 let fullPath = prefix ? `${prefix}.${relationName}` : relationName;
                 relations.push(fullPath);
 
@@ -1093,8 +1064,8 @@ public class DataOrder {
         let entities = this.selectedModel.entities;
         let file = [];
         entities.forEach(entity => {
-            let entityNameCamel = stringUtil.camelize(entity.name);
-            let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
+            let entityNameCamel = StringUtil.camelize(entity.name);
+            let upperCamelEntityName = StringUtil.upperCamel(entityNameCamel);
 
 
                 // === 1. Main repository ===
@@ -1163,17 +1134,17 @@ public class ${upperCamelEntityName}Connection
         let _this = this;
 
         entities.forEach(entity => {
-            let entityNameCamel = stringUtil.camelize(entity.name);
-            let upperCamelEntityName = stringUtil.upperCamel(entityNameCamel);
+            let entityNameCamel = StringUtil.camelize(entity.name);
+            let upperCamelEntityName = StringUtil.upperCamel(entityNameCamel);
             let primaryKeys = this.getPrimaryKeys(entity);
 
             if (primaryKeys.length > 0) {
                 let pkType = primaryKeys.length > 1
                     ? `${upperCamelEntityName}Id`
-                    : this.getJavaType(primaryKeys[0].type);
+                    : TypeUtil.getJavaType(primaryKeys[0].type);
 
-                let methodNameSuffix = primaryKeys.map(pk => stringUtil.upperCamel(stringUtil.camelize(pk.name))).join('And');
-                let paramList = primaryKeys.map(pk => `${this.getJavaType(pk.type)} ${stringUtil.camelize(pk.name)}`).join(', ');
+                let methodNameSuffix = primaryKeys.map(pk => StringUtil.upperCamel(StringUtil.camelize(pk.name))).join('And');
+                let paramList = primaryKeys.map(pk => `${TypeUtil.getJavaType(pk.type)} ${StringUtil.camelize(pk.name)}`).join(', ');
 
                 let javaLangTypes = ["String", "Long", "Integer", "Double", "Float", "Boolean", "Character", "Byte", "Short"];
                 let pkTypeImport = "";
@@ -1260,8 +1231,8 @@ public interface ${upperCamelEntityName}InputRepository extends JpaRepository<${
 
         entities.forEach(entity => {
             let entityName = entity.name;
-            let upperCamelEntityName = stringUtil.upperCamel(stringUtil.camelize(entityName));
-            let entityNameSnake = stringUtil.snakeize(entityName);
+            let upperCamelEntityName = StringUtil.upperCamel(StringUtil.camelize(entityName));
+            let entityNameSnake = StringUtil.snakeize(entityName);
             let primaryKeys = this.getPrimaryKeys(entity);
 
             // === 1. Main entity ===
@@ -1310,11 +1281,11 @@ import lombok.Getter;
 
         entity.columns.forEach(column => {
             let columnName = column.name;
-            let columnCamelName = stringUtil.camelize(columnName);
+            let columnCamelName = StringUtil.camelize(columnName);
             let columnType = column.type;
-            let columnJavaType = this.getJavaType(columnType);
+            let columnJavaType = TypeUtil.getJavaType(columnType);
             let objectName = columnCamelName.substring(0, columnCamelName.length - 2);
-            let objectType = stringUtil.upperCamel(objectName);
+            let objectType = StringUtil.upperCamel(objectName);
 
             if (column.primaryKey) {
                 entityContent += `    @Id
@@ -1425,9 +1396,9 @@ import lombok.Getter;
 
         entity.columns.forEach(column => {
             let columnName = column.name;
-            let columnCamelName = stringUtil.camelize(columnName);
+            let columnCamelName = StringUtil.camelize(columnName);
             let columnType = column.type;
-            let columnJavaType = this.getJavaType(columnType);
+            let columnJavaType = TypeUtil.getJavaType(columnType);
 
             if (column.primaryKey) {
                 entityInputContent += `    @Id
@@ -1488,9 +1459,9 @@ import ${this.packageName}.entity.${upperCamelEntityName}Input;
 
         entity.columns.forEach(column => {
             let columnName = column.name;
-            let columnCamelName = stringUtil.camelize(columnName);
+            let columnCamelName = StringUtil.camelize(columnName);
             let columnType = column.type;
-            let columnJavaType = this.getJavaType(columnType);
+            let columnJavaType = TypeUtil.getJavaType(columnType);
 
             if (!column.autoIncrement) {
                 entityCreateContent += `    private ${columnJavaType} ${columnCamelName};
@@ -1551,9 +1522,9 @@ import ${this.packageName}.entity.${upperCamelEntityName}Input;
 
         entity.columns.forEach(column => {
             let columnName = column.name;
-            let columnCamelName = stringUtil.camelize(columnName);
+            let columnCamelName = StringUtil.camelize(columnName);
             let columnType = column.type;
-            let columnJavaType = this.getJavaType(columnType);
+            let columnJavaType = TypeUtil.getJavaType(columnType);
 
             entityUpdateContent += `    private ${columnJavaType} ${columnCamelName};
 `;
@@ -1848,7 +1819,7 @@ public class PageUtil {
         this.model.entities.forEach(entity => {
             let primaryKeys = this.getPrimaryKeys(entity);
             if (primaryKeys.length > 1) {
-                let idClassName = `${stringUtil.upperCamel(stringUtil.camelize(entity.name))}Id`;
+                let idClassName = `${StringUtil.upperCamel(StringUtil.camelize(entity.name))}Id`;
                 let content = `package ${this.packageName}.entity;
 
 import java.io.Serializable;
@@ -1867,8 +1838,8 @@ public class ${idClassName} implements Serializable {
 
 `;
                 primaryKeys.forEach(pk => {
-                    let pkNameCamel = stringUtil.camelize(pk.name);
-                    let pkJavaType = this.getJavaType(pk.type);
+                    let pkNameCamel = StringUtil.camelize(pk.name);
+                    let pkJavaType = TypeUtil.getJavaType(pk.type);
                     
                     
                     if (pk.primaryKey) {
@@ -1891,12 +1862,12 @@ public class ${idClassName} implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ${idClassName} that = (${idClassName}) o;
-        return ${primaryKeys.map(pk => `Objects.equals(${stringUtil.camelize(pk.name)}, that.${stringUtil.camelize(pk.name)})`).join(' && ')};
+        return ${primaryKeys.map(pk => `Objects.equals(${StringUtil.camelize(pk.name)}, that.${StringUtil.camelize(pk.name)})`).join(' && ')};
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(${primaryKeys.map(pk => stringUtil.camelize(pk.name)).join(', ')});
+        return Objects.hash(${primaryKeys.map(pk => StringUtil.camelize(pk.name)).join(', ')});
     }
 
 `;

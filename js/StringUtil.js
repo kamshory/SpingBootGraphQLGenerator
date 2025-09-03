@@ -5,7 +5,7 @@ class StringUtil
      * @param {string} str - The input string.
      * @returns {string} The camelCase formatted string.
      */
-    camelize(str) {
+    static camelize(str) {
         const normalized = str.replace(/[^a-zA-Z0-9 ]/g, ' ').toLowerCase();
         return normalized.split(' ').map((word, index) => {
             if (index === 0) return word;
@@ -18,7 +18,7 @@ class StringUtil
      * @param {string} camelCaseStr - The camelCase string.
      * @returns {string} The UpperCamelCase formatted string.
      */
-    upperCamel(camelCaseStr) {
+    static upperCamel(camelCaseStr) {
         return camelCaseStr
             .replace(/([A-Z])/g, '$1')
             .replace(/^./, str => str.toUpperCase());
@@ -29,7 +29,7 @@ class StringUtil
      * @param {string} header - The input string.
      * @returns {string} The snake_case formatted string.
      */
-    snakeize(header) {
+    static snakeize(header) {
         let ucwords = header
             .replace(/[_\-]+/g, ' ') // NOSONAR
             .replace(/([a-z])([A-Z])/g, '$1 $2')

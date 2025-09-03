@@ -50,7 +50,7 @@ class SQLParser {
                 let importedEntities = [];
                 res1[0].values.forEach((row, index) => {
                     const tableName = row[0]; // Extract table name
-                    let entity = new Entity(stringUtil.snakeize(tableName), index);
+                    let entity = new Entity(StringUtil.snakeize(tableName), index);
 
                     // --- Start: Add data import capability ---
                     let tableData = _this.db.exec(`SELECT * FROM ${tableName};`);
@@ -68,7 +68,7 @@ class SQLParser {
                         entity.data = values.map(rowValues => /*NOSONAR*/ {
                             const rowObject = {};
                             columns.forEach((colName, colIndex) => {
-                                const snakeKey = stringUtil.snakeize(colName);
+                                const snakeKey = StringUtil.snakeize(colName);
                                 rowObject[snakeKey] = rowValues[colIndex];
                             });
                             return rowObject;
@@ -91,7 +91,7 @@ class SQLParser {
                             {
                                 isAutoIncrement = false;
                             }
-                            let columnName = stringUtil.snakeize(columnInfo[1]);
+                            let columnName = StringUtil.snakeize(columnInfo[1]);
                             let columnType = _this.toMySqlType(columnInfo[2]);
                             let columnSize = _this.getColumnSize(columnInfo[2]);
                             let isNull = columnInfo[3] === 1;
